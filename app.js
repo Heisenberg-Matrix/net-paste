@@ -6,7 +6,7 @@ const COMMANDS_KEY = "netcmd.commands";
 const CAT_STORAGE_KEY = "netcmd.categories";
 const NAME_KEY = "netcmd.hideName";
 const SCHEMA_KEY = "netcmd.schema";
-const SCHEMA_VERSION = "2";
+const SCHEMA_VERSION = "3";
 
 /*
  * Eye-friendly color presets. Backgrounds are very low alpha so the
@@ -29,39 +29,40 @@ const colorByKey = key =>
  * From then on every command and category lives in localStorage and is
  * edited through the UI — the seed never overrides user data.
  */
+/* Categories are identified by their name — no separate id. */
 const SEED_CATEGORIES = [
-  { id: "h3c", name: "H3C", color: "red", builtin: true },
-  { id: "ib",  name: "IB",  color: "green", builtin: true },
+  { name: "H3C", color: "red", builtin: true },
+  { name: "IB",  color: "green", builtin: true },
 ];
 
 const SEED_COMMANDS = [
   /* ---- H3C ---- */
-  { cat: "h3c", name: "Routing table",         template: "display ip routing-table" },
-  { cat: "h3c", name: "Current config",        template: "display current-configuration" },
-  { cat: "h3c", name: "Interface brief",       template: "display ip interface brief" },
-  { cat: "h3c", name: "ARP all",               template: "display arp all" },
-  { cat: "h3c", name: "MAC address",           template: "display mac-address" },
-  { cat: "h3c", name: "VLANs",                 template: "display vlan" },
-  { cat: "h3c", name: "LLDP neighbors",        template: "display lldp neighbor brief" },
-  { cat: "h3c", name: "OSPF peers",            template: "display ospf peer brief" },
-  { cat: "h3c", name: "BGP peer",              template: "display bgp routing-table ipv4 peer {peer}" },
-  { cat: "h3c", name: "BGP advertised routes", template: "display bgp routing-table ipv4 peer {peer} advertised-routes" },
-  { cat: "h3c", name: "BGP received routes",   template: "display bgp routing-table ipv4 peer {peer} received-routes" },
-  { cat: "h3c", name: "Interface stats",       template: "display interface {interface}" },
-  { cat: "h3c", name: "Route lookup",          template: "display ip routing-table {ip}" },
-  { cat: "h3c", name: "VLAN detail",           template: "display vlan {vlan}" },
+  { cat: "H3C", name: "Routing table",         template: "display ip routing-table" },
+  { cat: "H3C", name: "Current config",        template: "display current-configuration" },
+  { cat: "H3C", name: "Interface brief",       template: "display ip interface brief" },
+  { cat: "H3C", name: "ARP all",               template: "display arp all" },
+  { cat: "H3C", name: "MAC address",           template: "display mac-address" },
+  { cat: "H3C", name: "VLANs",                 template: "display vlan" },
+  { cat: "H3C", name: "LLDP neighbors",        template: "display lldp neighbor brief" },
+  { cat: "H3C", name: "OSPF peers",            template: "display ospf peer brief" },
+  { cat: "H3C", name: "BGP peer",              template: "display bgp routing-table ipv4 peer {peer}" },
+  { cat: "H3C", name: "BGP advertised routes", template: "display bgp routing-table ipv4 peer {peer} advertised-routes" },
+  { cat: "H3C", name: "BGP received routes",   template: "display bgp routing-table ipv4 peer {peer} received-routes" },
+  { cat: "H3C", name: "Interface stats",       template: "display interface {interface}" },
+  { cat: "H3C", name: "Route lookup",          template: "display ip routing-table {ip}" },
+  { cat: "H3C", name: "VLAN detail",           template: "display vlan {vlan}" },
 
   /* ---- IB (NVIDIA InfiniBand switch) ---- */
-  { cat: "ib", name: "Port status",     template: "ibstat" },
-  { cat: "ib", name: "Topology",        template: "ibnetdiscover" },
-  { cat: "ib", name: "Link errors",     template: "ibqueryerrors" },
-  { cat: "ib", name: "Fabric diagnose", template: "ibdiagnet" },
-  { cat: "ib", name: "Hosts",           template: "ibhosts" },
-  { cat: "ib", name: "Switches",        template: "ibswitches" },
-  { cat: "ib", name: "Port counters",   template: "smpquery portcounters {lid}" },
-  { cat: "ib", name: "Version",         template: "show version" },
-  { cat: "ib", name: "Inventory",       template: "show inventory" },
-  { cat: "ib", name: "Running config",  template: "show running-config" },
+  { cat: "IB", name: "Port status",     template: "ibstat" },
+  { cat: "IB", name: "Topology",        template: "ibnetdiscover" },
+  { cat: "IB", name: "Link errors",     template: "ibqueryerrors" },
+  { cat: "IB", name: "Fabric diagnose", template: "ibdiagnet" },
+  { cat: "IB", name: "Hosts",           template: "ibhosts" },
+  { cat: "IB", name: "Switches",        template: "ibswitches" },
+  { cat: "IB", name: "Port counters",   template: "smpquery portcounters {lid}" },
+  { cat: "IB", name: "Version",         template: "show version" },
+  { cat: "IB", name: "Inventory",       template: "show inventory" },
+  { cat: "IB", name: "Running config",  template: "show running-config" },
 ];
 
 /* ---- storage ---- */
@@ -87,24 +88,52 @@ function saveCategories(list) {
 }
 
 /*
- * One-time migration to the unified model (schema 2).
- * v1 kept commands split between code and localStorage, hid deleted
- * built-ins in netcmd.hidden, and stored user categories without the
- * built-in ones. Merge all of that into netcmd.commands / netcmd.categories.
+ * One-time migration to the name-keyed model (schema 3).
+ * - v1 kept commands split between code and localStorage, hid deleted
+ *   built-ins in netcmd.hidden, and stored user categories without the
+ *   built-in ones.
+ * - v2 unified storage but addressed categories by generated ids.
+ * Both collapse into: categories [{name, color, builtin?}],
+ * commands [{name, template, cat: <category name>}].
  */
 function migrateIfNeeded() {
   if (localStorage.getItem(SCHEMA_KEY) === SCHEMA_VERSION) return;
 
-  const oldCats = loadCategories().filter(c => !SEED_CATEGORIES.some(s => s.id === c.id));
-  saveCategories([...SEED_CATEGORIES.map(c => ({ ...c })), ...oldCats]);
-
+  let cats = loadCategories();
   const hidden = readJson("netcmd.hidden") || [];
   const oldCustom = readJson("netcmd.custom") || [];
-  saveCommands([
-    ...SEED_COMMANDS.filter(c => !hidden.includes(c.template)),
-    ...oldCustom.map(c => ({ name: c.name || "", template: c.template, cat: c.cat || "" })),
-  ]);
+  let cmds = readJson(COMMANDS_KEY);
 
+  if (!Array.isArray(cmds)) {
+    // v1: build the unified command list from seeds + old custom data
+    cmds = [
+      ...SEED_COMMANDS.filter(c => !hidden.includes(c.template)),
+      ...oldCustom.map(c => ({ name: c.name || "", template: c.template, cat: c.cat || "" })),
+    ];
+  }
+
+  // v1 stored only user categories — make sure the seeds are present, first
+  if (!cats.some(c => c.name === "H3C")) cats = [...SEED_CATEGORIES.map(c => ({ ...c })), ...cats];
+
+  // ids (v2) → names; drop duplicates
+  const byId = new Map(cats.filter(c => c.id).map(c => [c.id, c.name]));
+  const seen = new Set();
+  const cats3 = [];
+  cats.forEach(c => {
+    if (!c.name || seen.has(c.name)) return;
+    seen.add(c.name);
+    const out = { name: c.name, color: c.color || "gray" };
+    if (c.builtin) out.builtin = true;
+    cats3.push(out);
+  });
+  const cmds3 = (Array.isArray(cmds) ? cmds : []).map(c => ({
+    name: c.name || "",
+    template: c.template,
+    cat: byId.get(c.cat) || c.cat || "",
+  }));
+
+  saveCategories(cats3);
+  saveCommands(cmds3);
   localStorage.removeItem("netcmd.custom");
   localStorage.removeItem("netcmd.hidden");
   localStorage.setItem(SCHEMA_KEY, SCHEMA_VERSION);
@@ -332,12 +361,12 @@ function dropCommand(from, to, before) {
   render();
 }
 
-/* Move command `from` to the end of category `catId`. */
-function dropCommandIntoCategory(from, catId) {
+/* Move command `from` to the end of category `catName`. */
+function dropCommandIntoCategory(from, catName) {
   const cmds = loadCommands();
   if (from < 0 || from >= cmds.length) { endDrag(); return; }
   const [moved] = cmds.splice(from, 1);
-  moved.cat = catId;
+  moved.cat = catName;
   cmds.push(moved);
   saveCommands(cmds);
   endDrag();
@@ -448,14 +477,14 @@ function menuItem(text, onClick) {
   return b;
 }
 
-function openCatMenu(x, y, catId, catName, isVirtual) {
+function openCatMenu(x, y, catName, isVirtual) {
   closeCtxMenu();
   const menu = document.createElement("div");
   menu.className = "ctx-menu";
 
   const clearItem = menuItem("Clear all commands", () => {
     armConfirm(clearItem, () => {
-      saveCommands(loadCommands().filter(c => c.cat !== catId));
+      saveCommands(loadCommands().filter(c => c.cat !== catName));
       closeCtxMenu();
       render();
     });
@@ -466,7 +495,7 @@ function openCatMenu(x, y, catId, catName, isVirtual) {
     const delItem = menuItem("Delete category", () => {
       armConfirm(delItem, () => {
         // commands inside are NOT lost — they fall to Uncategorized
-        saveCategories(loadCategories().filter(c => c.id !== catId));
+        saveCategories(loadCategories().filter(c => c.name !== catName));
         closeCtxMenu();
         render();
       });
@@ -514,18 +543,18 @@ function buildSection(cat, rows, isVirtual) {
   kebab.addEventListener("click", e => {
     e.stopPropagation(); // keep the document click handler from closing it again
     const r = kebab.getBoundingClientRect();
-    openCatMenu(r.left, r.bottom + 2, cat.id, cat.name, isVirtual);
+    openCatMenu(r.left, r.bottom + 2, cat.name, isVirtual);
   });
   header.appendChild(kebab);
 
   header.addEventListener("contextmenu", e => {
     e.preventDefault();
-    openCatMenu(e.clientX, e.clientY, cat.id, cat.name, isVirtual);
+    openCatMenu(e.clientX, e.clientY, cat.name, isVirtual);
   });
 
   /* drag: drop this category before another one */
   header.addEventListener("dragstart", e => {
-    drag = { type: "cat", id: cat.id, el: header };
+    drag = { type: "cat", name: cat.name, el: header };
     header.classList.add("dragging");
     document.body.classList.add("drag-cursor");
     e.dataTransfer.effectAllowed = "move";
@@ -533,18 +562,18 @@ function buildSection(cat, rows, isVirtual) {
   });
   header.addEventListener("dragend", () => { header.draggable = false; endDrag(); });
   header.addEventListener("dragover", e => {
-    if (!drag || drag.type !== "cat" || drag.id === cat.id) return;
+    if (!drag || drag.type !== "cat" || drag.name === cat.name) return;
     e.preventDefault();
     e.stopPropagation();
     header.classList.add("drop-into");
   });
   header.addEventListener("drop", e => {
-    if (!drag || drag.type !== "cat" || drag.id === cat.id) return;
+    if (!drag || drag.type !== "cat" || drag.name === cat.name) return;
     e.preventDefault();
     e.stopPropagation();
     const cats = loadCategories();
-    const from = cats.findIndex(c => c.id === drag.id);
-    const to = cats.findIndex(c => c.id === cat.id);
+    const from = cats.findIndex(c => c.name === drag.name);
+    const to = cats.findIndex(c => c.name === cat.name);
     if (from > -1 && to > -1 && from !== to) {
       const [moved] = cats.splice(from, 1);
       cats.splice(to, 0, moved);
@@ -567,7 +596,7 @@ function buildSection(cat, rows, isVirtual) {
     if (!drag || drag.type !== "cmd") return;
     if (e.target.closest("li.cmd")) return;
     e.preventDefault();
-    dropCommandIntoCategory(drag.index, cat.id);
+    dropCommandIntoCategory(drag.index, cat.name);
   });
 
   const ul = document.createElement("ul");
@@ -586,15 +615,15 @@ function render() {
 
   cats.forEach(cat => {
     const rows = cmds.map((c, i) => ({ c, i }))
-      .filter(({ c }) => c.cat === cat.id)
+      .filter(({ c }) => c.cat === cat.name)
       .map(({ c, i }) => buildRow(c, i));
     wrap.appendChild(buildSection(cat, rows, false));
   });
 
   // commands whose category is gone (or was never set)
-  const orphan = cmds.map((c, i) => ({ c, i })).filter(({ c }) => !cats.some(k => k.id === c.cat));
+  const orphan = cmds.map((c, i) => ({ c, i })).filter(({ c }) => !cats.some(k => k.name === c.cat));
   if (orphan.length) {
-    wrap.appendChild(buildSection({ id: "", name: "Uncategorized", color: "gray" }, orphan.map(({ c, i }) => buildRow(c, i)), true));
+    wrap.appendChild(buildSection({ name: "Uncategorized", color: "gray" }, orphan.map(({ c, i }) => buildRow(c, i)), true));
   }
 
   refreshCatSelect(cats);
@@ -609,7 +638,7 @@ function refreshCatSelect(cats) {
   select.appendChild(uncat);
   cats.forEach(cat => {
     const opt = document.createElement("option");
-    opt.value = cat.id;
+    opt.value = cat.name;
     opt.textContent = cat.name;
     select.appendChild(opt);
   });
@@ -656,10 +685,19 @@ document.getElementById("add-cat-form").addEventListener("submit", e => {
   e.preventDefault();
   const name = document.getElementById("add-cat-name").value.trim();
   if (!name) return;
+  const msg = document.getElementById("add-cat-msg");
+  const showMsg = text => {
+    msg.textContent = text;
+    setTimeout(() => { msg.textContent = ""; }, 2500);
+  };
+  // name IS the id — it must be unique
+  if (loadCategories().some(c => c.name.toLowerCase() === name.toLowerCase())) {
+    showMsg("Category already exists");
+    return;
+  }
   const color = document.querySelector('input[name="cat-color"]:checked');
   const cats = loadCategories();
   cats.push({
-    id: "c" + Date.now().toString(36),
     name,
     color: color ? color.value : "gray",
   });
@@ -683,8 +721,7 @@ function toYaml() {
     "categories:",
   ];
   loadCategories().forEach(c => {
-    lines.push("  - id: " + yamlQuote(c.id));
-    lines.push("    name: " + yamlQuote(c.name));
+    lines.push("  - name: " + yamlQuote(c.name));
     lines.push("    color: " + yamlQuote(c.color || "gray"));
     if (c.builtin) lines.push("    builtin: true");
   });
@@ -757,24 +794,29 @@ function parseYaml(text) {
 function importYaml(text) {
   const { categories, commands } = parseYaml(text);
 
+  // categories are keyed by name — duplicates (case-insensitive) are dropped
   const seen = new Set();
   const cats = categories
-    .filter(c => c && c.id && c.name)
+    .filter(c => c && c.name)
     .map(c => ({
-      id: String(c.id),
-      name: String(c.name),
+      name: String(c.name).trim(),
       color: colorByKey(String(c.color || "")).key === String(c.color) ? String(c.color) : "gray",
       ...(c.builtin === true ? { builtin: true } : {}),
     }))
-    .filter(c => !seen.has(c.id) && seen.add(c.id));
+    .filter(c => !seen.has(c.name.toLowerCase()) && seen.add(c.name.toLowerCase()));
 
+  // cat references are matched against category names, case-insensitively
+  const nameMap = new Map(cats.map(c => [c.name.toLowerCase(), c.name]));
   const cmds = commands
     .filter(c => c && c.template)
-    .map(c => ({
-      name: c.name ? String(c.name) : "",
-      template: String(c.template),
-      cat: c.cat ? String(c.cat) : "",
-    }));
+    .map(c => {
+      const raw = c.cat ? String(c.cat).trim() : "";
+      return {
+        name: c.name ? String(c.name) : "",
+        template: String(c.template),
+        cat: nameMap.get(raw.toLowerCase()) || raw,
+      };
+    });
 
   if (!cats.length && !cmds.length) throw new Error("no categories or commands found");
   return { cats, cmds };

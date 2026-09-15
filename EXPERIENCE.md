@@ -116,16 +116,18 @@
 
 全部在浏览器 localStorage，无后端、无账号、无同步。
 
-**统一模型（schema 2）**：代码里的 `SEED_CATEGORIES` / `SEED_COMMANDS` 只是「出厂预设」，只在首次打开（或清空浏览器数据）时种入 localStorage。之后**所有命令和分类都是同一份用户数据**，增删改全走页面 UI，代码预设永不覆盖用户数据。
+**统一模型（schema 3）**：代码里的 `SEED_CATEGORIES` / `SEED_COMMANDS` 只是「出厂预设」，只在首次打开（或清空浏览器数据）时种入 localStorage。之后**所有命令和分类都是同一份用户数据**，增删改全走页面 UI，代码预设永不覆盖用户数据。
+
+**分类以 name 为唯一标识**（没有单独 id，用户看到的 name 就是身份）：分类名不区分大小写唯一；命令的 `cat` 字段直接存分类名；YAML 里手写大小写不一致也能对上（导入时大小写不敏感匹配）。
 
 | key | 内容 |
 |---|---|
-| `netcmd.commands` | `[{name, template, cat}]` 全部命令（出厂 + 用户添加） |
-| `netcmd.categories` | `[{id, name, color, builtin?}]` 全部分类（`builtin: true` = 出厂自带） |
+| `netcmd.commands` | `[{name, template, cat}]` 全部命令，`cat` = 分类名 |
+| `netcmd.categories` | `[{name, color, builtin?}]` 全部分类（`builtin: true` = 出厂自带） |
 | `netcmd.hideName` | `"1"` = 隐藏名称列 |
-| `netcmd.schema` | 数据格式版本标记，当前 `"2"` |
+| `netcmd.schema` | 数据格式版本标记，当前 `"3"` |
 
-从 v0.1.4 及更早版本升级时会自动迁移：已删的内置命令保持删除、自定义命令保留、自定义分类保留，旧 key（`netcmd.custom` / `netcmd.hidden`）迁移后清除。
+从旧版本升级时自动迁移：已删的内置命令保持删除、自定义命令与分类保留，v2 的分类 id 自动换成分类名，旧 key（`netcmd.custom` / `netcmd.hidden`）迁移后清除。
 
 清掉浏览器数据 = 恢复出厂预设，自定义内容清空，属预期行为。
 
@@ -156,3 +158,4 @@
 | v0.1.8 | 控件圆角化：按钮 4px + 极轻阴影，输入框/折叠框 6px，YAML 文本框 focus 高亮，行保持全平 |
 | v0.1.9 | 复制反馈增强：✓ Copied + 按钮弹跳 + 整行绿色闪烁渐隐 |
 | v0.1.10 | YAML 编辑器语法高亮（透明 textarea + 高亮层叠加）、Tab 缩进、数据区 UI 重做（提示语、操作栏、Replace 主按钮、导出名改 net-paste.yaml） |
+| v0.2.0 | 分类去掉自造 id，以 name 为唯一标识（不区分大小写唯一）；YAML 不再有 id 字段；命令 cat 直接引用分类名；旧数据自动迁移到 schema 3 |

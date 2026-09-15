@@ -249,6 +249,7 @@ form button {
 form button:hover { background: #eee; }
 
 #add-form input[type="text"] { width: 40ch; }
+#add-cat-msg { color: #c33; font-size: 12px; }
 
 /* eye-friendly color swatches for new categories */
 .swatch {
