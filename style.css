@@ -176,7 +176,25 @@ li.cmd:hover { box-shadow: inset 0 0 0 999px rgba(0, 0, 0, 0.04); }
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 .cmd .copy-btn:hover { background: #eee; }
-.cmd .copy-btn.copied { background: #2c7a2a; border-color: #2c7a2a; color: #fff; }
+.cmd .copy-btn.copied {
+  background: #2c7a2a;
+  border-color: #2c7a2a;
+  color: #fff;
+  font-weight: bold;
+  animation: pop 0.18s ease-out;
+}
+@keyframes pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+
+/* row-level copy feedback: green flash, then fades back to the category tint */
+li.cmd { transition: background-color 0.5s ease; }
+li.cmd.just-copied {
+  background: rgba(44, 122, 42, 0.18);
+  transition: background-color 0.08s;
+}
 
 .cmd .del-btn {
   font: inherit;

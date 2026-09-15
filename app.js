@@ -145,10 +145,14 @@ function fallbackCopy(text) {
   document.body.removeChild(ta);
 }
 
-function showCopied(btn) {
+function showCopied(btn, row) {
   const old = btn.textContent;
-  btn.textContent = "Copied";
+  btn.textContent = "✓ Copied";
   btn.classList.add("copied");
+  if (row) {
+    row.classList.add("just-copied");
+    setTimeout(() => row.classList.remove("just-copied"), 600);
+  }
   setTimeout(() => { btn.textContent = old; btn.classList.remove("copied"); }, 1200);
 }
 
@@ -344,7 +348,7 @@ function dropCommandIntoCategory(from, catId) {
 function activate(li, item, copyBtn, focusParam) {
   const params = paramsOf(item.template);
   if (params.length === 0) {
-    copyToClipboard(item.template).then(() => showCopied(copyBtn));
+    copyToClipboard(item.template).then(() => showCopied(copyBtn, li));
     return;
   }
 
@@ -409,7 +413,7 @@ function finishEdit(li, item, copyBtn) {
     input.replaceWith(span);
   });
   li._values = values;
-  copyToClipboard(fillTemplate(item.template, values)).then(() => showCopied(copyBtn));
+  copyToClipboard(fillTemplate(item.template, values)).then(() => showCopied(copyBtn, li));
 }
 
 /* Escape: back to placeholders, values kept for next time. */
