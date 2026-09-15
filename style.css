@@ -20,18 +20,50 @@ header {
 .logo { font-size: 16px; font-weight: bold; }
 .tagline { color: #888; font-size: 12px; }
 
-ul#cmd-list { list-style: none; }
+/* ---- category sections: one category, one translucent tint ---- */
+.cat { margin-bottom: 8px; }
+
+.cat-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 4px 1px 2px;
+  border-bottom: 2px solid var(--accent);
+  margin-bottom: 1px;
+  user-select: none;
+}
+.cat-header .chip {
+  width: 9px;
+  height: 9px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+.cat-name { font-weight: bold; color: var(--accent); }
+.cat-count { color: #999; font-size: 11px; }
+.cat-header .del-btn {
+  font: inherit;
+  border: none;
+  background: none;
+  color: #bbb;
+  cursor: pointer;
+  padding: 0 2px;
+  margin-left: auto;
+}
+.cat-header .del-btn:hover { color: #c33; }
+
+.cat ul { list-style: none; }
 
 li.cmd {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 3px 6px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  background: var(--tint); /* translucent category tint — text stays readable */
   cursor: pointer;
   white-space: nowrap;
 }
-li.cmd:hover { background: #f0f0f0; }
+li.cmd:hover { box-shadow: inset 0 0 0 999px rgba(0, 0, 0, 0.04); }
 
 .cmd .name {
   color: #888;
@@ -70,7 +102,7 @@ li.cmd:hover { background: #f0f0f0; }
   color: #333;
 }
 .cmd .copy-btn:hover { background: #eee; }
-.cmd .copy-btn.copied { background: #2c7a2c; border-color: #2c7a2c; color: #fff; }
+.cmd .copy-btn.copied { background: #2c7a2a; border-color: #2c7a2a; color: #fff; }
 
 .cmd .del-btn {
   font: inherit;
@@ -82,32 +114,51 @@ li.cmd:hover { background: #f0f0f0; }
 }
 .cmd .del-btn:hover { color: #c33; }
 
-/* add box */
-#add-box { margin-top: 12px; font-size: 13px; }
-#add-box summary { cursor: pointer; color: #555; user-select: none; }
-#add-form {
+/* add boxes */
+details { margin-top: 12px; font-size: 13px; }
+details summary { cursor: pointer; color: #555; user-select: none; }
+form {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
   margin-top: 6px;
   padding: 8px;
   background: #f3f3f3;
   border: 1px solid #ddd;
 }
-#add-form label { color: #555; }
-#add-form input {
+form label { color: #555; }
+form input[type="text"], form select {
   font: inherit;
   border: 1px solid #bbb;
   padding: 2px 5px;
-  width: 40ch;
 }
-#add-form button {
+form button {
   font: inherit;
   border: 1px solid #bbb;
   background: #fff;
   padding: 2px 12px;
   cursor: pointer;
 }
-#add-form button:hover { background: #eee; }
+form button:hover { background: #eee; }
+
+#add-form input[type="text"] { width: 40ch; }
+
+/* eye-friendly color swatches for new categories */
+.swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  color: #555;
+}
+.swatch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.swatch .dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.swatch input:checked ~ .dot { outline: 2px solid #444; outline-offset: 1px; }
 
 footer { margin-top: 20px; color: #aaa; font-size: 11px; }

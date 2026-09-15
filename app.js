@@ -3,22 +3,58 @@
 "use strict";
 
 const STORAGE_KEY = "netcmd.custom";
+const CAT_STORAGE_KEY = "netcmd.categories";
+
+/*
+ * Eye-friendly color presets. Backgrounds are very low alpha so the
+ * command text always stays readable on top of the tint.
+ */
+const COLOR_PRESETS = [
+  { key: "red",    label: "浅红", accent: "#b0524a", bg: "rgba(176, 82, 74, 0.07)" },
+  { key: "green",  label: "浅绿", accent: "#0e7a5f", bg: "rgba(14, 122, 95, 0.05)" },
+  { key: "blue",   label: "浅蓝", accent: "#3a6ea5", bg: "rgba(58, 110, 165, 0.06)" },
+  { key: "amber",  label: "浅黄", accent: "#a97b12", bg: "rgba(169, 123, 18, 0.07)" },
+  { key: "purple", label: "浅紫", accent: "#7a5ea8", bg: "rgba(122, 94, 168, 0.06)" },
+  { key: "teal",   label: "浅青", accent: "#0e7f8c", bg: "rgba(14, 127, 140, 0.05)" },
+  { key: "gray",   label: "灰色", accent: "#666666", bg: "rgba(102, 102, 102, 0.05)" },
+];
+const colorByKey = key =>
+  COLOR_PRESETS.find(c => c.key === key) || COLOR_PRESETS[COLOR_PRESETS.length - 1];
+
+/* Built-in categories. User-added ones live in localStorage. */
+const DEFAULT_CATEGORIES = [
+  { id: "h3c", name: "华三", color: "red" },
+  { id: "ib",  name: "IB",  color: "green" },
+];
 
 const BUILTINS = [
-  { name: "Routing table",          template: "display ip routing-table" },
-  { name: "Current config",         template: "display current-configuration" },
-  { name: "Interface brief",        template: "display ip interface brief" },
-  { name: "ARP all",                template: "display arp all" },
-  { name: "MAC address",            template: "display mac-address" },
-  { name: "VLANs",                  template: "display vlan" },
-  { name: "LLDP neighbors",         template: "display lldp neighbor brief" },
-  { name: "OSPF peers",             template: "display ospf peer brief" },
-  { name: "BGP peer",               template: "display bgp routing-table ipv4 peer {peer}" },
-  { name: "BGP advertised routes",  template: "display bgp routing-table ipv4 peer {peer} advertised-routes" },
-  { name: "BGP received routes",    template: "display bgp routing-table ipv4 peer {peer} received-routes" },
-  { name: "Interface stats",        template: "display interface {interface}" },
-  { name: "Route lookup",           template: "display ip routing-table {ip}" },
-  { name: "VLAN detail",            template: "display vlan {vlan}" },
+  /* ---- 华三 ---- */
+  { cat: "h3c", name: "Routing table",         template: "display ip routing-table" },
+  { cat: "h3c", name: "Current config",        template: "display current-configuration" },
+  { cat: "h3c", name: "Interface brief",       template: "display ip interface brief" },
+  { cat: "h3c", name: "ARP all",               template: "display arp all" },
+  { cat: "h3c", name: "MAC address",           template: "display mac-address" },
+  { cat: "h3c", name: "VLANs",                 template: "display vlan" },
+  { cat: "h3c", name: "LLDP neighbors",        template: "display lldp neighbor brief" },
+  { cat: "h3c", name: "OSPF peers",            template: "display ospf peer brief" },
+  { cat: "h3c", name: "BGP peer",              template: "display bgp routing-table ipv4 peer {peer}" },
+  { cat: "h3c", name: "BGP advertised routes", template: "display bgp routing-table ipv4 peer {peer} advertised-routes" },
+  { cat: "h3c", name: "BGP received routes",   template: "display bgp routing-table ipv4 peer {peer} received-routes" },
+  { cat: "h3c", name: "Interface stats",       template: "display interface {interface}" },
+  { cat: "h3c", name: "Route lookup",          template: "display ip routing-table {ip}" },
+  { cat: "h3c", name: "VLAN detail",           template: "display vlan {vlan}" },
+
+  /* ---- IB (NVIDIA InfiniBand switch) ---- */
+  { cat: "ib", name: "Port status",     template: "ibstat" },
+  { cat: "ib", name: "Topology",        template: "ibnetdiscover" },
+  { cat: "ib", name: "Link errors",     template: "ibqueryerrors" },
+  { cat: "ib", name: "Fabric diagnose", template: "ibdiagnet" },
+  { cat: "ib", name: "Hosts",           template: "ibhosts" },
+  { cat: "ib", name: "Switches",        template: "ibswitches" },
+  { cat: "ib", name: "Port counters",   template: "smpquery portcounters {lid}" },
+  { cat: "ib", name: "Version",         template: "show version" },
+  { cat: "ib", name: "Inventory",       template: "show inventory" },
+  { cat: "ib", name: "Running config",  template: "show running-config" },
 ];
 
 function loadCustom() {
@@ -27,6 +63,13 @@ function loadCustom() {
 }
 function saveCustom(list) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+}
+function loadCategories() {
+  try { return JSON.parse(localStorage.getItem(CAT_STORAGE_KEY)) || []; }
+  catch { return []; }
+}
+function saveCategories(list) {
+  localStorage.setItem(CAT_STORAGE_KEY, JSON.stringify(list));
 }
 
 function paramsOf(template) {
@@ -69,8 +112,6 @@ function showCopied(btn) {
   setTimeout(() => { btn.textContent = old; btn.classList.remove("copied"); }, 1200);
 }
 
-const listEl = document.getElementById("cmd-list");
-
 /* Render the command text; {param} becomes a clickable span. */
 function renderTemplateHtml(template) {
   const div = document.createElement("div");
@@ -89,7 +130,7 @@ function renderTemplateHtml(template) {
   return div;
 }
 
-function buildRow(item, isCustom, index) {
+function buildRow(item, isCustom) {
   const li = document.createElement("li");
   li.className = "cmd";
   li._values = {};
@@ -120,9 +161,12 @@ function buildRow(item, isCustom, index) {
     delBtn.addEventListener("click", e => {
       e.stopPropagation();
       const custom = loadCustom();
-      custom.splice(index, 1);
-      saveCustom(custom);
-      render();
+      const i = custom.indexOf(item);
+      if (i > -1) {
+        custom.splice(i, 1);
+        saveCustom(custom);
+        render();
+      }
     });
     li.appendChild(delBtn);
   }
@@ -218,11 +262,92 @@ function cancelEdit(li) {
   });
 }
 
-function render() {
-  listEl.textContent = "";
-  BUILTINS.forEach(item => listEl.appendChild(buildRow(item, false, -1)));
-  loadCustom().forEach((item, i) => listEl.appendChild(buildRow(item, true, i)));
+/* ---- category sections ---- */
+
+function buildSection(cat, rows, deletable) {
+  const colors = colorByKey(cat.color);
+  const section = document.createElement("section");
+  section.className = "cat";
+  section.style.setProperty("--accent", colors.accent);
+  section.style.setProperty("--tint", colors.bg);
+
+  const header = document.createElement("div");
+  header.className = "cat-header";
+
+  const chip = document.createElement("span");
+  chip.className = "chip";
+  const nameEl = document.createElement("span");
+  nameEl.className = "cat-name";
+  nameEl.textContent = cat.name;
+  const countEl = document.createElement("span");
+  countEl.className = "cat-count";
+  countEl.textContent = rows.length;
+  header.append(chip, nameEl, countEl);
+
+  if (deletable) {
+    const delBtn = document.createElement("button");
+    delBtn.className = "del-btn";
+    delBtn.type = "button";
+    delBtn.title = "Delete empty category";
+    delBtn.textContent = "×";
+    delBtn.addEventListener("click", () => {
+      saveCategories(loadCategories().filter(c => c.id !== cat.id));
+      render();
+    });
+    header.appendChild(delBtn);
+  }
+
+  section.appendChild(header);
+
+  const ul = document.createElement("ul");
+  rows.forEach(row => ul.appendChild(row));
+  section.appendChild(ul);
+
+  return section;
 }
+
+function render() {
+  const wrap = document.getElementById("cmd-list");
+  wrap.textContent = "";
+
+  const cats = [...DEFAULT_CATEGORIES, ...loadCategories()];
+  const custom = loadCustom();
+
+  cats.forEach(cat => {
+    const rows = [
+      ...BUILTINS.filter(c => c.cat === cat.id).map(c => buildRow(c, false)),
+      ...custom.filter(c => c.cat === cat.id).map(c => buildRow(c, true)),
+    ];
+    // user-added categories are deletable only while empty
+    const deletable = !DEFAULT_CATEGORIES.some(d => d.id === cat.id) && rows.length === 0;
+    wrap.appendChild(buildSection(cat, rows, deletable));
+  });
+
+  // custom commands whose category is gone (or was never set)
+  const orphan = custom.filter(c => !cats.some(k => k.id === c.cat));
+  if (orphan.length) {
+    wrap.appendChild(buildSection({ name: "未分类", color: "gray" }, orphan.map(c => buildRow(c, true)), false));
+  }
+
+  refreshCatSelect(cats);
+}
+
+function refreshCatSelect(cats) {
+  const select = document.getElementById("add-cat");
+  select.textContent = "";
+  const uncat = document.createElement("option");
+  uncat.value = "";
+  uncat.textContent = "未分类";
+  select.appendChild(uncat);
+  cats.forEach(cat => {
+    const opt = document.createElement("option");
+    opt.value = cat.id;
+    opt.textContent = cat.name;
+    select.appendChild(opt);
+  });
+}
+
+/* ---- add command ---- */
 
 document.getElementById("add-form").addEventListener("submit", e => {
   e.preventDefault();
@@ -230,11 +355,51 @@ document.getElementById("add-form").addEventListener("submit", e => {
   const template = document.getElementById("add-template").value.trim();
   if (!template) return;
   const custom = loadCustom();
-  custom.push({ name, template });
+  custom.push({ name, template, cat: document.getElementById("add-cat").value });
   saveCustom(custom);
   e.target.reset();
   document.getElementById("add-box").removeAttribute("open");
   render();
 });
 
+/* ---- add category ---- */
+
+function buildSwatches() {
+  const wrap = document.getElementById("color-swatches");
+  wrap.textContent = "";
+  COLOR_PRESETS.forEach((preset, i) => {
+    const label = document.createElement("label");
+    label.className = "swatch";
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = "cat-color";
+    radio.value = preset.key;
+    if (preset.key === "blue") radio.checked = true; // default for new categories
+    const dot = document.createElement("span");
+    dot.className = "dot";
+    dot.style.setProperty("--accent", preset.accent);
+    dot.title = preset.label;
+    label.append(radio, dot, document.createTextNode(preset.label));
+    wrap.appendChild(label);
+  });
+}
+
+document.getElementById("add-cat-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const name = document.getElementById("add-cat-name").value.trim();
+  if (!name) return;
+  const color = document.querySelector('input[name="cat-color"]:checked');
+  const cats = loadCategories();
+  cats.push({
+    id: "c" + Date.now().toString(36),
+    name,
+    color: color ? color.value : "gray",
+  });
+  saveCategories(cats);
+  e.target.reset();
+  document.getElementById("add-cat-box").removeAttribute("open");
+  render();
+});
+
+buildSwatches();
 render();

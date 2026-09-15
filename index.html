@@ -13,19 +13,29 @@
 </header>
 
 <main>
-  <ul id="cmd-list"></ul>
+  <div id="cmd-list"></div>
 
   <details id="add-box">
-    <summary>+ Add</summary>
+    <summary>+ Add command</summary>
     <form id="add-form">
       <label>Name <input id="add-name" type="text" placeholder="BGP advertised routes" autocomplete="off"></label>
       <label>Template <input id="add-template" type="text" placeholder="display bgp routing-table ipv4 peer {peer} advertised-routes" autocomplete="off"></label>
+      <label>Category <select id="add-cat"></select></label>
+      <button type="submit">Save</button>
+    </form>
+  </details>
+
+  <details id="add-cat-box">
+    <summary>+ Add category</summary>
+    <form id="add-cat-form">
+      <label>Name <input id="add-cat-name" type="text" placeholder="Cisco" autocomplete="off"></label>
+      <span id="color-swatches"></span>
       <button type="submit">Save</button>
     </form>
   </details>
 </main>
 
-<footer>Custom templates are stored in your browser's localStorage.</footer>
+<footer>Custom commands and categories are stored in your browser's localStorage.</footer>
 
 <script src="app.js"></script>
 </body>
