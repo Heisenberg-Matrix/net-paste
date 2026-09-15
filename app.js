@@ -152,7 +152,9 @@ function paramsOf(template) {
 }
 
 function fillTemplate(template, values) {
-  return template.replace(/\{(\w+)\}/g, (_, p) => values[p] !== undefined ? values[p] : "{" + p + "}");
+  // unfilled (empty) params keep their {placeholder} in the copied text
+  return template.replace(/\{(\w+)\}/g, (_, p) =>
+    values[p] !== undefined && values[p] !== "" ? values[p] : "{" + p + "}");
 }
 
 function copyToClipboard(text) {
@@ -283,7 +285,7 @@ function buildRow(item, index) {
   copyBtn.textContent = "Copy";
   copyBtn.addEventListener("click", e => {
     e.stopPropagation();
-    activate(li, item, copyBtn, null);
+    copyNow(li, item, copyBtn);
   });
   li.appendChild(copyBtn);
 
@@ -306,10 +308,15 @@ function buildRow(item, index) {
   });
   li.appendChild(delBtn);
 
-  // clicking a {param} span starts editing right there, in place
+  // click anywhere on the row = copy now (unfilled params keep {placeholders});
+  // clicking a {param} span = edit it in place
   li.addEventListener("click", e => {
     const param = e.target.dataset ? e.target.dataset.param : null;
-    activate(li, item, copyBtn, param);
+    if (param) {
+      activate(li, item, copyBtn, param);
+    } else {
+      copyNow(li, item, copyBtn);
+    }
   });
 
   /* drag: reorder within a category, or drop into another category */
@@ -373,14 +380,41 @@ function dropCommandIntoCategory(from, catName) {
   render();
 }
 
+/* Click-to-copy: current values (inputs if editing, filled spans otherwise);
+ * unfilled params keep their {placeholder} in the copied text. */
+function collectValues(li) {
+  const values = {};
+  li.querySelectorAll("input[data-param]").forEach(i => values[i.dataset.param] = i.value.trim());
+  li.querySelectorAll("span[data-param]").forEach(s =>
+    values[s.dataset.param] = s.classList.contains("filled") ? s.textContent : "");
+  return values;
+}
+
+/* Turn open inputs back into spans showing the (filled or placeholder) text. */
+function freezeInputs(li) {
+  li.querySelectorAll("input[data-param]").forEach(input => {
+    const span = document.createElement("span");
+    span.dataset.param = input.dataset.param;
+    if (input.value.trim()) {
+      span.className = "param filled";
+      span.textContent = input.value.trim();
+    } else {
+      span.className = "param";
+      span.textContent = "{" + input.dataset.param + "}";
+    }
+    input.replaceWith(span);
+  });
+}
+
+function copyNow(li, item, copyBtn) {
+  const values = collectValues(li);
+  if (li.querySelector("input[data-param]")) freezeInputs(li);
+  li._values = values;
+  copyToClipboard(fillTemplate(item.template, values)).then(() => showCopied(copyBtn, li));
+}
+
 /* Turn {param} spans into in-place inputs (focusParam = which one to focus). */
 function activate(li, item, copyBtn, focusParam) {
-  const params = paramsOf(item.template);
-  if (params.length === 0) {
-    copyToClipboard(item.template).then(() => showCopied(copyBtn, li));
-    return;
-  }
-
   li.draggable = false; // never drag while typing (grip mousedown may have enabled it)
 
   let inputs = [...li.querySelectorAll("input[data-param]")];
@@ -427,20 +461,8 @@ function sizeInput(input) {
 
 /* Enter: freeze values back into the command line, copy it, done. */
 function finishEdit(li, item, copyBtn) {
-  const values = {};
-  li.querySelectorAll("input[data-param]").forEach(input => {
-    values[input.dataset.param] = input.value.trim();
-    const span = document.createElement("span");
-    span.dataset.param = input.dataset.param;
-    if (input.value.trim()) {
-      span.className = "param filled";
-      span.textContent = input.value.trim();
-    } else {
-      span.className = "param";
-      span.textContent = "{" + input.dataset.param + "}";
-    }
-    input.replaceWith(span);
-  });
+  const values = collectValues(li);
+  freezeInputs(li);
   li._values = values;
   copyToClipboard(fillTemplate(item.template, values)).then(() => showCopied(copyBtn, li));
 }
