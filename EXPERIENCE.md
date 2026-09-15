@@ -51,14 +51,15 @@
 - **单条命令**：行尾 × → 确认后从 `netcmd.commands` 删除。
 - **分类操作 = 右键菜单**：右键分类标题（或 hover 出现的 ⋯ 按钮）弹出菜单：
   - **Clear all commands**：该分类下所有命令一次删除（解决逐条删慢的问题）
-  - **Delete category**：随时可删（不再要求先清空），里面的命令**不丢**，自动落到 Uncategorized
-- **清空所有自定义分类**（页面底部小字链接 `Clear custom categories`，藏得深但好用）：删除全部用户分类（`builtin` 分类保留），命令落到 Uncategorized。
+  - **Delete category**：随时可删，里面的命令**不丢**，自动落到 Uncategorized
 - 删掉的命令想找回：Add command 重新加，或整体重置（见维护指南）。
 
 ### 拖动排序
 
-- **命令行**：整行可拖，蓝色插入线指示落点。拖到另一分类的行上/空白处 = 移动到该分类。参数编辑中禁止拖动（避免和输入冲突）。
-- **分类**：拖分类标题到另一个分类标题上 = 调整分类顺序。
+- 飞书风格 **grip 手柄**：每行/每个分类标题前有六个点（⠿），hover 行时出现，移上去鼠标变抓手（grab），拖动中全局变 grabbing。
+- **只能从 grip 拖动**（按下 grip 才启用拖拽），避免误拖和选字冲突；参数编辑中 grip 也无效。
+- **命令行**：拖到目标位置（插入线指示落点）；拖到另一分类的行上/空白处 = 移动到该分类。
+- **分类**：拖 grip 到另一个分类标题上 = 调整分类顺序。
 - 排序结果即 `netcmd.commands` / `netcmd.categories` 的存储顺序。
 
 ### 数据替换（YAML）
@@ -67,10 +68,10 @@
 
 - 打开即显示当前全部数据的 YAML（categories + commands，所见即所得）。
 - 直接改文本 → **Replace all**（两步确认）→ **整体替换**所有命令和分类。
-- **Open file** 载入本地 .yaml 文件到文本框；**Download .yaml** 下载文本框内容。
+- **Export** 下载文本框内容为 .yaml 文件；**Import** 载入本地 .yaml 到文本框（提示 review 后再 Replace all）。
 - **Reload** 从存储重新生成（撤销手改）。
 - YAML 只支持本工具生成的子集（`categories:` / `commands:` 两个列表），不追求通用；注释、单双引号、转义都支持。
-- 换电脑/换浏览器：下载 yaml → 新环境打开 Data 框 → Open file → Replace all。
+- 换电脑/换浏览器：Export → 新环境 Import → Replace all。
 
 ## 大区分类（颜色系统）
 
@@ -149,3 +150,4 @@
 | v0.1.4 | UI 全英文（华三→H3C）；所有删除动作两步确认（Sure?）；分类一键 clear；底部 Clear custom categories |
 | v0.1.5 | 数据模型统一：命令/分类全部外置到 localStorage（schema 2），代码仅保留出厂预设，旧数据自动迁移；任何空分类可删 |
 | v0.1.6 | 拖动排序（命令跨分类拖动、分类拖动排序）；YAML 数据替换（编辑/打开文件/下载/整体替换）；分类操作改为右键菜单 + ⋯ 按钮，删分类不再要求先清空 |
+| v0.1.7 | 移除底部 Clear custom categories（右键菜单已覆盖）；飞书风格 grip 拖拽手柄（仅 grip 可拖、grab/grabbing 光标）；修复 Sure? 确认后按钮不恢复；YAML 按钮改名 Export / Import |

@@ -40,18 +40,15 @@
     <textarea id="yaml-text" rows="16" spellcheck="false"></textarea>
     <div class="data-actions">
       <button type="button" id="yaml-reload">Reload</button>
-      <button type="button" id="yaml-download">Download .yaml</button>
-      <label class="file-label">Open file<input type="file" id="yaml-file" accept=".yaml,.yml,.txt"></label>
+      <button type="button" id="yaml-download">Export</button>
+      <label class="file-label">Import<input type="file" id="yaml-file" accept=".yaml,.yml,.txt"></label>
       <button type="button" id="yaml-replace">Replace all</button>
       <span id="yaml-msg"></span>
     </div>
   </details>
 </main>
 
-<footer>
-  Custom commands and categories are stored in your browser's localStorage.
-  <button id="reset-cats" type="button" title="Remove all custom categories — their commands move to Uncategorized">Clear custom categories</button>
-</footer>
+<footer>Custom commands and categories are stored in your browser's localStorage.</footer>
 
 <script src="app.js"></script>
 </body>

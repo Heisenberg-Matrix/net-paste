@@ -159,6 +159,8 @@ function showCopied(btn) {
 function armConfirm(btn, action) {
   if (btn.dataset.armed === "1") {
     btn.dataset.armed = "";
+    btn.textContent = btn.dataset.oldText || btn.textContent;
+    btn.classList.remove("armed");
     action();
     return;
   }
@@ -183,7 +185,28 @@ function endDrag() {
   document.querySelectorAll(".dragging, .drop-above, .drop-below, .drop-into").forEach(el => {
     el.classList.remove("dragging", "drop-above", "drop-below", "drop-into");
   });
+  document.body.classList.remove("drag-cursor");
   drag = null;
+}
+
+/*
+ * Feishu-style drag grip: six dots at the front, hand cursor, and the row
+ * only becomes draggable while the mouse is down on the grip.
+ */
+function makeGrip(host) {
+  const g = document.createElement("span");
+  g.className = "grip";
+  g.textContent = "⠿";
+  g.title = "Drag to reorder";
+  g.addEventListener("mousedown", () => {
+    host.draggable = true;
+    const reset = () => {
+      host.draggable = false;
+      document.removeEventListener("mouseup", reset);
+    };
+    document.addEventListener("mouseup", reset);
+  });
+  return g;
 }
 
 /* ---- command rows ---- */
@@ -209,9 +232,10 @@ function renderTemplateHtml(template) {
 function buildRow(item, index) {
   const li = document.createElement("li");
   li.className = "cmd";
-  li.draggable = true;
   li._cmdIndex = index;
   li._values = {};
+
+  li.appendChild(makeGrip(li));
 
   const name = document.createElement("span");
   name.className = "name";
@@ -260,10 +284,11 @@ function buildRow(item, index) {
     if (li.querySelector("input[data-param]")) { e.preventDefault(); return; } // not while editing
     drag = { type: "cmd", index, el: li };
     li.classList.add("dragging");
+    document.body.classList.add("drag-cursor");
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", "netcmd-cmd");
   });
-  li.addEventListener("dragend", endDrag);
+  li.addEventListener("dragend", () => { li.draggable = false; endDrag(); });
   li.addEventListener("dragover", e => {
     if (!drag || drag.type !== "cmd") return;
     e.preventDefault();
@@ -323,7 +348,7 @@ function activate(li, item, copyBtn, focusParam) {
     return;
   }
 
-  li.draggable = false; // don't drag while typing
+  li.draggable = false; // never drag while typing (grip mousedown may have enabled it)
 
   let inputs = [...li.querySelectorAll("input[data-param]")];
   if (!inputs.length) {
@@ -384,7 +409,6 @@ function finishEdit(li, item, copyBtn) {
     input.replaceWith(span);
   });
   li._values = values;
-  li.draggable = true;
   copyToClipboard(fillTemplate(item.template, values)).then(() => showCopied(copyBtn));
 }
 
@@ -398,7 +422,6 @@ function cancelEdit(li) {
     span.textContent = "{" + input.dataset.param + "}";
     input.replaceWith(span);
   });
-  li.draggable = true;
 }
 
 /* ---- category context menu (right-click or the ⋯ button) ---- */
@@ -465,8 +488,9 @@ function buildSection(cat, rows, isVirtual) {
 
   const header = document.createElement("div");
   header.className = "cat-header";
-  header.draggable = !isVirtual;
-  header.title = "Drag to reorder categories · right-click for actions";
+  header.title = "Right-click for actions";
+
+  if (!isVirtual) header.appendChild(makeGrip(header));
 
   const chip = document.createElement("span");
   chip.className = "chip";
@@ -499,10 +523,11 @@ function buildSection(cat, rows, isVirtual) {
   header.addEventListener("dragstart", e => {
     drag = { type: "cat", id: cat.id, el: header };
     header.classList.add("dragging");
+    document.body.classList.add("drag-cursor");
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", "netcmd-cat");
   });
-  header.addEventListener("dragend", endDrag);
+  header.addEventListener("dragend", () => { header.draggable = false; endDrag(); });
   header.addEventListener("dragover", e => {
     if (!drag || drag.type !== "cat" || drag.id === cat.id) return;
     e.preventDefault();
@@ -782,7 +807,10 @@ document.getElementById("yaml-file").addEventListener("change", e => {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = () => { yamlText.value = reader.result; setYamlMsg(""); };
+  reader.onload = () => {
+    yamlText.value = reader.result;
+    setYamlMsg("Loaded — review, then click Replace all");
+  };
   reader.readAsText(file);
   e.target.value = ""; // allow re-opening the same file
 });
@@ -815,16 +843,6 @@ nameToggle.addEventListener("click", () => {
   applyNamePref();
 });
 applyNamePref();
-
-/* ---- footer: clear all custom categories (kept out of the way) ----
- * Commands inside them are NOT lost — they move to Uncategorized. */
-
-document.getElementById("reset-cats").addEventListener("click", e => {
-  armConfirm(e.currentTarget, () => {
-    saveCategories(loadCategories().filter(c => c.builtin));
-    render();
-  });
-});
 
 migrateIfNeeded();
 render();

@@ -93,6 +93,18 @@ body.hide-name .cmd .name { display: none; }
 
 /* drag & drop indicators */
 li.cmd { position: relative; }
+.grip {
+  color: #bbb;
+  cursor: grab;
+  font-size: 12px;
+  line-height: 1;
+  user-select: none;
+  padding-right: 2px;
+  opacity: 0;
+}
+li.cmd:hover .grip, .cat-header:hover .grip { opacity: 1; }
+.grip:hover { color: #555; }
+body.drag-cursor, body.drag-cursor * { cursor: grabbing !important; }
 li.cmd.dragging { opacity: 0.4; }
 li.cmd.drop-above::before,
 li.cmd.drop-below::after {
@@ -262,15 +274,3 @@ form button:hover { background: #eee; }
 #yaml-msg.bad { color: #c33; }
 
 footer { margin-top: 20px; color: #aaa; font-size: 11px; }
-#reset-cats {
-  font: inherit;
-  font-size: 11px;
-  color: #aaa;
-  background: none;
-  border: none;
-  cursor: pointer;
-  text-decoration: underline;
-  padding: 0;
-  margin-left: 8px;
-}
-#reset-cats:hover, #reset-cats.armed { color: #c33; }
