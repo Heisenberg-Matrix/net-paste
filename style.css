@@ -1,0 +1,119 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font: 13px/1.4 Consolas, Menlo, monospace;
+  color: #222;
+  background: #fafafa;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 10px 14px 30px;
+}
+
+header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+}
+.logo { font-size: 16px; font-weight: bold; }
+.tagline { color: #888; font-size: 12px; }
+
+ul#cmd-list { list-style: none; }
+
+li.cmd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+  white-space: nowrap;
+}
+li.cmd:hover { background: #f0f0f0; }
+
+.cmd .name {
+  color: #888;
+  min-width: 21ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cmd .template {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cmd .template .param { color: #b05c00; }
+
+.cmd .copy-btn {
+  font: inherit;
+  font-size: 12px;
+  border: 1px solid #bbb;
+  background: #fff;
+  padding: 1px 10px;
+  cursor: pointer;
+  color: #333;
+}
+.cmd .copy-btn:hover { background: #eee; }
+.cmd .copy-btn.copied { background: #2c7a2c; border-color: #2c7a2c; color: #fff; }
+
+.cmd .del-btn {
+  font: inherit;
+  border: none;
+  background: none;
+  color: #bbb;
+  cursor: pointer;
+  padding: 0 2px;
+}
+.cmd .del-btn:hover { color: #c33; }
+
+/* inline parameter form, shown under the row */
+.param-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 6px;
+  background: #f3f3f3;
+  border-bottom: 1px solid #eee;
+}
+.param-form label { color: #555; }
+.param-form input {
+  font: inherit;
+  border: 1px solid #bbb;
+  padding: 1px 5px;
+  width: 18ch;
+}
+.param-form input:focus { outline: 1px solid #2c7a2c; }
+.param-form .hint { color: #999; font-size: 12px; }
+
+/* add box */
+#add-box { margin-top: 12px; font-size: 13px; }
+#add-box summary { cursor: pointer; color: #555; user-select: none; }
+#add-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 8px;
+  background: #f3f3f3;
+  border: 1px solid #ddd;
+}
+#add-form label { color: #555; }
+#add-form input {
+  font: inherit;
+  border: 1px solid #bbb;
+  padding: 2px 5px;
+  width: 40ch;
+}
+#add-form button {
+  font: inherit;
+  border: 1px solid #bbb;
+  background: #fff;
+  padding: 2px 12px;
+  cursor: pointer;
+}
+#add-form button:hover { background: #eee; }
+
+footer { margin-top: 20px; color: #aaa; font-size: 11px; }

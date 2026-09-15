@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NetCmd</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <span class="logo">NetCmd</span>
+  <span class="tagline">Find. Fill. Copy.</span>
+</header>
+
+<main>
+  <ul id="cmd-list"></ul>
+
+  <details id="add-box">
+    <summary>+ Add</summary>
+    <form id="add-form">
+      <label>Name <input id="add-name" type="text" placeholder="BGP advertised routes" autocomplete="off"></label>
+      <label>Template <input id="add-template" type="text" placeholder="display bgp routing-table ipv4 peer {peer} advertised-routes" autocomplete="off"></label>
+      <button type="submit">Save</button>
+    </form>
+  </details>
+</main>
+
+<footer>Custom templates are stored in your browser's localStorage.</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
