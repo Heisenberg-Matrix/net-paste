@@ -2,10 +2,11 @@
 
 "use strict";
 
-const STORAGE_KEY = "netcmd.custom";
+const COMMANDS_KEY = "netcmd.commands";
 const CAT_STORAGE_KEY = "netcmd.categories";
-const HIDDEN_KEY = "netcmd.hidden";     // built-in commands deleted by the user (by template)
-const NAME_KEY = "netcmd.hideName";     // "1" = name column hidden
+const NAME_KEY = "netcmd.hideName";
+const SCHEMA_KEY = "netcmd.schema";
+const SCHEMA_VERSION = "2";
 
 /*
  * Eye-friendly color presets. Backgrounds are very low alpha so the
@@ -23,14 +24,18 @@ const COLOR_PRESETS = [
 const colorByKey = key =>
   COLOR_PRESETS.find(c => c.key === key) || COLOR_PRESETS[COLOR_PRESETS.length - 1];
 
-/* Built-in categories. User-added ones live in localStorage. */
-const DEFAULT_CATEGORIES = [
-  { id: "h3c", name: "H3C", color: "red" },
-  { id: "ib",  name: "IB",  color: "green" },
+/*
+ * Factory defaults. These only seed a fresh browser (or a storage reset).
+ * From then on every command and category lives in localStorage and is
+ * edited through the UI — the seed never overrides user data.
+ */
+const SEED_CATEGORIES = [
+  { id: "h3c", name: "H3C", color: "red", builtin: true },
+  { id: "ib",  name: "IB",  color: "green", builtin: true },
 ];
 
-const BUILTINS = [
-  /* ---- 华三 ---- */
+const SEED_COMMANDS = [
+  /* ---- H3C ---- */
   { cat: "h3c", name: "Routing table",         template: "display ip routing-table" },
   { cat: "h3c", name: "Current config",        template: "display current-configuration" },
   { cat: "h3c", name: "Interface brief",       template: "display ip interface brief" },
@@ -59,27 +64,53 @@ const BUILTINS = [
   { cat: "ib", name: "Running config",  template: "show running-config" },
 ];
 
-function loadCustom() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
-  catch { return []; }
+/* ---- storage ---- */
+
+function readJson(key) {
+  try { return JSON.parse(localStorage.getItem(key)); } catch { return null; }
 }
-function saveCustom(list) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+
+function loadCommands() {
+  const cmds = readJson(COMMANDS_KEY);
+  return Array.isArray(cmds) ? cmds : [];
 }
+function saveCommands(list) {
+  localStorage.setItem(COMMANDS_KEY, JSON.stringify(list));
+}
+
 function loadCategories() {
-  try { return JSON.parse(localStorage.getItem(CAT_STORAGE_KEY)) || []; }
-  catch { return []; }
+  const cats = readJson(CAT_STORAGE_KEY);
+  return Array.isArray(cats) ? cats : [];
 }
 function saveCategories(list) {
   localStorage.setItem(CAT_STORAGE_KEY, JSON.stringify(list));
 }
-function loadHidden() {
-  try { return JSON.parse(localStorage.getItem(HIDDEN_KEY)) || []; }
-  catch { return []; }
+
+/*
+ * One-time migration to the unified model (schema 2).
+ * v1 kept commands split between code and localStorage, hid deleted
+ * built-ins in netcmd.hidden, and stored user categories without the
+ * built-in ones. Merge all of that into netcmd.commands / netcmd.categories.
+ */
+function migrateIfNeeded() {
+  if (localStorage.getItem(SCHEMA_KEY) === SCHEMA_VERSION) return;
+
+  const oldCats = loadCategories().filter(c => !SEED_CATEGORIES.some(s => s.id === c.id));
+  saveCategories([...SEED_CATEGORIES.map(c => ({ ...c })), ...oldCats]);
+
+  const hidden = readJson("netcmd.hidden") || [];
+  const oldCustom = readJson("netcmd.custom") || [];
+  saveCommands([
+    ...SEED_COMMANDS.filter(c => !hidden.includes(c.template)),
+    ...oldCustom.map(c => ({ name: c.name || "", template: c.template, cat: c.cat || "" })),
+  ]);
+
+  localStorage.removeItem("netcmd.custom");
+  localStorage.removeItem("netcmd.hidden");
+  localStorage.setItem(SCHEMA_KEY, SCHEMA_VERSION);
 }
-function saveHidden(list) {
-  localStorage.setItem(HIDDEN_KEY, JSON.stringify(list));
-}
+
+/* ---- template helpers ---- */
 
 function paramsOf(template) {
   const set = [];
@@ -144,6 +175,8 @@ function armConfirm(btn, action) {
   }, 2500);
 }
 
+/* ---- command rows ---- */
+
 /* Render the command text; {param} becomes a clickable span. */
 function renderTemplateHtml(template) {
   const div = document.createElement("div");
@@ -162,7 +195,7 @@ function renderTemplateHtml(template) {
   return div;
 }
 
-function buildRow(item, isCustom, customIndex) {
+function buildRow(item, index) {
   const li = document.createElement("li");
   li.className = "cmd";
   li._values = {};
@@ -192,17 +225,11 @@ function buildRow(item, isCustom, customIndex) {
   delBtn.addEventListener("click", e => {
     e.stopPropagation();
     armConfirm(delBtn, () => {
-      if (isCustom) {
-        // customIndex is the row's position in the stored array at render time
-        const custom = loadCustom();
-        if (customIndex > -1 && customIndex < custom.length) {
-          custom.splice(customIndex, 1);
-          saveCustom(custom);
-        }
-      } else {
-        const hidden = loadHidden();
-        if (!hidden.includes(item.template)) hidden.push(item.template);
-        saveHidden(hidden);
+      // index is the row's position in the stored array at render time
+      const cmds = loadCommands();
+      if (index > -1 && index < cmds.length) {
+        cmds.splice(index, 1);
+        saveCommands(cmds);
       }
       render();
     });
@@ -362,14 +389,9 @@ function buildSection(cat, rows, opts) {
   return section;
 }
 
-/* Clear a whole category: hide its built-ins, drop custom commands in it. */
+/* Clear a whole category in one shot. */
 function clearCategory(catId) {
-  const hidden = loadHidden();
-  BUILTINS.forEach(c => {
-    if (c.cat === catId && !hidden.includes(c.template)) hidden.push(c.template);
-  });
-  saveHidden(hidden);
-  saveCustom(loadCustom().filter(c => c.cat !== catId));
+  saveCommands(loadCommands().filter(c => c.cat !== catId));
   render();
 }
 
@@ -377,30 +399,27 @@ function render() {
   const wrap = document.getElementById("cmd-list");
   wrap.textContent = "";
 
-  const cats = [...DEFAULT_CATEGORIES, ...loadCategories()];
-  const custom = loadCustom();
-  const hidden = loadHidden();
+  const cats = loadCategories();
+  const cmds = loadCommands();
 
   cats.forEach(cat => {
-    const rows = [
-      ...BUILTINS.filter(c => c.cat === cat.id && !hidden.includes(c.template))
-        .map(c => buildRow(c, false)),
-      ...custom.map((c, i) => ({ c, i }))
-        .filter(({ c }) => c.cat === cat.id)
-        .map(({ c, i }) => buildRow(c, true, i)),
-    ];
-    // user-added categories are deletable only while empty
-    const deletable = !DEFAULT_CATEGORIES.some(d => d.id === cat.id) && rows.length === 0;
-    wrap.appendChild(buildSection(cat, rows, { deletable, onClear: () => clearCategory(cat.id) }));
+    const rows = cmds.map((c, i) => ({ c, i }))
+      .filter(({ c }) => c.cat === cat.id)
+      .map(({ c, i }) => buildRow(c, i));
+    // any category is deletable once it's empty
+    wrap.appendChild(buildSection(cat, rows, {
+      deletable: rows.length === 0,
+      onClear: () => clearCategory(cat.id),
+    }));
   });
 
-  // custom commands whose category is gone (or was never set)
-  const orphan = custom.map((c, i) => ({ c, i })).filter(({ c }) => !cats.some(k => k.id === c.cat));
+  // commands whose category is gone (or was never set)
+  const orphan = cmds.map((c, i) => ({ c, i })).filter(({ c }) => !cats.some(k => k.id === c.cat));
   if (orphan.length) {
-    wrap.appendChild(buildSection({ name: "Uncategorized", color: "gray" }, orphan.map(({ c, i }) => buildRow(c, true, i)), {
+    wrap.appendChild(buildSection({ name: "Uncategorized", color: "gray" }, orphan.map(({ c, i }) => buildRow(c, i)), {
       onClear: () => {
-        const valid = new Set([...DEFAULT_CATEGORIES, ...loadCategories()].map(k => k.id));
-        saveCustom(loadCustom().filter(c => valid.has(c.cat)));
+        const valid = new Set(loadCategories().map(k => k.id));
+        saveCommands(loadCommands().filter(c => valid.has(c.cat)));
         render();
       },
     }));
@@ -431,9 +450,9 @@ document.getElementById("add-form").addEventListener("submit", e => {
   const name = document.getElementById("add-name").value.trim();
   const template = document.getElementById("add-template").value.trim();
   if (!template) return;
-  const custom = loadCustom();
-  custom.push({ name, template, cat: document.getElementById("add-cat").value });
-  saveCustom(custom);
+  const cmds = loadCommands();
+  cmds.push({ name, template, cat: document.getElementById("add-cat").value });
+  saveCommands(cmds);
   e.target.reset();
   document.getElementById("add-box").removeAttribute("open");
   render();
@@ -444,7 +463,7 @@ document.getElementById("add-form").addEventListener("submit", e => {
 function buildSwatches() {
   const wrap = document.getElementById("color-swatches");
   wrap.textContent = "";
-  COLOR_PRESETS.forEach((preset, i) => {
+  COLOR_PRESETS.forEach(preset => {
     const label = document.createElement("label");
     label.className = "swatch";
     const radio = document.createElement("input");
@@ -499,9 +518,10 @@ applyNamePref();
 
 document.getElementById("reset-cats").addEventListener("click", e => {
   armConfirm(e.currentTarget, () => {
-    saveCategories([]);
+    saveCategories(loadCategories().filter(c => c.builtin));
     render();
   });
 });
 
+migrateIfNeeded();
 render();

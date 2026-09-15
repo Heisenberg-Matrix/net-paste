@@ -48,11 +48,11 @@
 
 所有删除/清除动作统一用**两步内联确认**：第一次点击按钮变成红色 `Sure?`，2.5 秒内再点一次才执行。没有模态弹窗，不打断复制主流程。
 
-- **单条命令**：行尾 × → 确认后删除。自定义命令从 `netcmd.custom` 移除；内置命令模板记入 `netcmd.hidden`。
-- **清空整个分类**（分类标题右侧 `clear`）：内置命令全部隐藏 + 该分类下自定义命令全部删除，一次解决逐条删的慢问题。清空 H3C/IB 后分类标题保留（内置分类不可删），内容为 0。
-- **清空所有自定义分类**（页面底部小字链接 `Clear custom categories`，藏得深但好用）：删除全部用户分类，其中的命令**不丢**，自动落到 Uncategorized。
-- 自定义分类为空时标题右侧出现 `delete`（同样两步确认）。
-- 恢复被隐藏的内置命令：浏览器控制台执行 `localStorage.removeItem('netcmd.hidden')` 后刷新。
+- **单条命令**：行尾 × → 确认后从 `netcmd.commands` 删除。
+- **清空整个分类**（分类标题右侧 `clear`）：该分类下所有命令一次删除，解决逐条删的慢问题。
+- **清空所有自定义分类**（页面底部小字链接 `Clear custom categories`，藏得深但好用）：删除全部用户分类（`builtin` 分类保留），其中的命令**不丢**，自动落到 Uncategorized。
+- **任何分类为空时**（包括清空后的 H3C/IB）标题右侧出现 `delete`（同样两步确认）——统一规则，无内置/自定义之分。
+- 删掉的命令想找回：Add command 重新加，或整体重置（见维护指南）。
 
 ## 大区分类（颜色系统）
 
@@ -93,23 +93,28 @@
 
 ## 数据存储
 
-全部在浏览器 localStorage，无后端、无账号、无同步：
+全部在浏览器 localStorage，无后端、无账号、无同步。
+
+**统一模型（schema 2）**：代码里的 `SEED_CATEGORIES` / `SEED_COMMANDS` 只是「出厂预设」，只在首次打开（或清空浏览器数据）时种入 localStorage。之后**所有命令和分类都是同一份用户数据**，增删改全走页面 UI，代码预设永不覆盖用户数据。
 
 | key | 内容 |
 |---|---|
-| `netcmd.custom` | `[{name, template, cat}]` 自定义命令 |
-| `netcmd.categories` | `[{id, name, color}]` 自定义分类（内置华三/IB 不在此列） |
-| `netcmd.hidden` | `[template, ...]` 用户删除的内置命令 |
+| `netcmd.commands` | `[{name, template, cat}]` 全部命令（出厂 + 用户添加） |
+| `netcmd.categories` | `[{id, name, color, builtin?}]` 全部分类（`builtin: true` = 出厂自带） |
 | `netcmd.hideName` | `"1"` = 隐藏名称列 |
+| `netcmd.schema` | 数据格式版本标记，当前 `"2"` |
 
-清掉浏览器数据 = 自定义内容清空，属预期行为。
+从 v0.1.4 及更早版本升级时会自动迁移：已删的内置命令保持删除、自定义命令保留、自定义分类保留，旧 key（`netcmd.custom` / `netcmd.hidden`）迁移后清除。
+
+清掉浏览器数据 = 恢复出厂预设，自定义内容清空，属预期行为。
 
 ## 维护指南
 
-- **加内置命令**：改 `app.js` 顶部 `BUILTINS` 数组（`cat` 填 `h3c` / `ib`）。
-- **加内置分类**：改 `DEFAULT_CATEGORIES`。
+- **加命令 / 加分类**：直接用页面上的 + Add command / + Add category，不用改代码。
+- **改出厂预设**（只影响新浏览器或重置后）：改 `app.js` 顶部 `SEED_COMMANDS` / `SEED_CATEGORIES`。
 - **调颜色**：改 `COLOR_PRESETS` 里的 `accent`（标题色）和 `bg`（半透明行背景），保持 alpha ≤ 0.07。
-- **改交互反馈**：Copied 时长在 `showCopied()`（当前 1200ms）。
+- **改交互反馈**：Copied 时长在 `showCopied()`（当前 1200ms）；确认窗口在 `armConfirm()`（当前 2500ms）。
+- **恢复出厂命令**：删掉的命令想找回，用 Add command 重新加即可；或控制台 `localStorage.removeItem('netcmd.commands'); localStorage.removeItem('netcmd.schema'); location.reload()` 重置全部命令（自定义的也会丢，慎用）。
 
 ## 永远不做
 
@@ -124,3 +129,4 @@
 | v0.1.2 | 大区分类 + 颜色系统（华三浅红 / IB 浅绿）、分类可添加可选色、本体验文档 |
 | v0.1.3 | 修复自定义命令删除失效；内置命令也可删除（记入 netcmd.hidden）；名称列可隐藏；新增命令 Name 改为可选 |
 | v0.1.4 | UI 全英文（华三→H3C）；所有删除动作两步确认（Sure?）；分类一键 clear；底部 Clear custom categories |
+| v0.1.5 | 数据模型统一：命令/分类全部外置到 localStorage（schema 2），代码仅保留出厂预设，旧数据自动迁移；任何空分类可删 |
