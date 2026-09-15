@@ -408,6 +408,12 @@ function freezeInputs(li) {
 
 function copyNow(li, item, copyBtn) {
   const values = collectValues(li);
+  const missing = paramsOf(item.template).filter(p => !values[p]);
+  if (missing.length) {
+    // not filled yet — jump into editing instead of copying a half-command
+    activate(li, item, copyBtn, missing[0]);
+    return;
+  }
   if (li.querySelector("input[data-param]")) freezeInputs(li);
   li._values = values;
   copyToClipboard(fillTemplate(item.template, values)).then(() => showCopied(copyBtn, li));
@@ -462,6 +468,13 @@ function sizeInput(input) {
 /* Enter: freeze values back into the command line, copy it, done. */
 function finishEdit(li, item, copyBtn) {
   const values = collectValues(li);
+  const missing = paramsOf(item.template).filter(p => !values[p]);
+  if (missing.length) {
+    // still incomplete — focus the first empty param, don't copy
+    const input = li.querySelector('input[data-param="' + missing[0] + '"]');
+    if (input) { input.focus(); input.select(); }
+    return;
+  }
   freezeInputs(li);
   li._values = values;
   copyToClipboard(fillTemplate(item.template, values)).then(() => showCopied(copyBtn, li));
