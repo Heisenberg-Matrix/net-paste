@@ -9,7 +9,9 @@ A minimal copy-paste tool for network engineers. Not a knowledge base, not a ter
 - Built-in commands grouped by category (华三 = light red tint, NVIDIA IB = light green tint). Add your own categories with eye-friendly colors.
 - No-parameter commands: **1 click → clipboard.**
 - Commands with `{placeholders}` (e.g. `{peer}`, `{interface}`): click, fill the inline inputs, press **Enter** → the final command is copied. No second Copy click.
-- Add your own templates (Name is optional, only Template is required). Everything is saved in your browser's localStorage and survives refresh. Any command — built-in or custom — can be deleted (two-step "Sure?" confirm), whole categories can be cleared at once, and the name column can be hidden.
+- Drag rows to reorder commands (across categories too), drag category headers to reorder categories. Right-click a category header for actions (clear / delete).
+- **Data (YAML)** box at the bottom: view, edit, download or load a `.yaml` file and replace everything in one click — the easy way to move your setup to another machine.
+- Add your own templates (Name is optional, only Template is required). Everything is saved in your browser's localStorage and survives refresh. Any command can be deleted (two-step "Sure?" confirm), and the name column can be hidden.
 
 ## Run
 

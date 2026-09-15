@@ -34,6 +34,18 @@
       <button type="submit">Save</button>
     </form>
   </details>
+
+  <details id="data-box">
+    <summary>Data (YAML)</summary>
+    <textarea id="yaml-text" rows="16" spellcheck="false"></textarea>
+    <div class="data-actions">
+      <button type="button" id="yaml-reload">Reload</button>
+      <button type="button" id="yaml-download">Download .yaml</button>
+      <label class="file-label">Open file<input type="file" id="yaml-file" accept=".yaml,.yml,.txt"></label>
+      <button type="button" id="yaml-replace">Replace all</button>
+      <span id="yaml-msg"></span>
+    </div>
+  </details>
 </main>
 
 <footer>

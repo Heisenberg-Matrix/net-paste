@@ -53,17 +53,60 @@ body.hide-name .cmd .name { display: none; }
 }
 .cat-name { font-weight: bold; color: var(--accent); }
 .cat-count { color: #999; font-size: 11px; }
-.cat-actions { margin-left: auto; display: flex; gap: 6px; }
-.cat-actions button {
+.cat-kebab {
   font: inherit;
-  font-size: 11px;
+  font-size: 13px;
   color: #999;
   background: none;
   border: none;
   cursor: pointer;
   padding: 0 2px;
+  margin-left: auto;
+  opacity: 0;
 }
-.cat-actions button:hover { color: #c33; }
+.cat-header:hover .cat-kebab, .cat-kebab:focus { opacity: 1; }
+.cat-kebab:hover { color: #333; }
+
+/* category context menu (right-click or ⋯) */
+.ctx-menu {
+  position: fixed;
+  z-index: 100;
+  background: #fff;
+  border: 1px solid #ccc;
+  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.15);
+  min-width: 170px;
+  padding: 2px 0;
+}
+.ctx-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 4px 12px;
+  color: #333;
+}
+.ctx-menu button:hover { background: #f0f0f0; color: #c33; }
+
+/* drag & drop indicators */
+li.cmd { position: relative; }
+li.cmd.dragging { opacity: 0.4; }
+li.cmd.drop-above::before,
+li.cmd.drop-below::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px solid #444;
+}
+li.cmd.drop-above::before { top: -1px; }
+li.cmd.drop-below::after { bottom: -1px; }
+.cat-header.dragging { opacity: 0.5; }
+.cat.drop-into, .cat-header.drop-into { outline: 2px dashed #999; outline-offset: -2px; }
 
 .cat ul { list-style: none; }
 
@@ -184,6 +227,39 @@ form button:hover { background: #eee; }
   background: var(--accent);
 }
 .swatch input:checked ~ .dot { outline: 2px solid #444; outline-offset: 1px; }
+
+/* YAML data box */
+#data-box textarea {
+  width: 100%;
+  margin-top: 6px;
+  font: inherit;
+  font-size: 12px;
+  border: 1px solid #bbb;
+  background: #fff;
+  padding: 6px;
+  resize: vertical;
+  white-space: pre;
+}
+.data-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+.data-actions button, .file-label {
+  font: inherit;
+  font-size: 12px;
+  border: 1px solid #bbb;
+  background: #fff;
+  padding: 2px 10px;
+  cursor: pointer;
+  color: #333;
+}
+.data-actions button:hover, .file-label:hover { background: #eee; }
+.file-label input { display: none; }
+#yaml-msg { color: #2c7a2a; font-size: 12px; }
+#yaml-msg.bad { color: #c33; }
 
 footer { margin-top: 20px; color: #aaa; font-size: 11px; }
 #reset-cats {

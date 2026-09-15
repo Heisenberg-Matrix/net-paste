@@ -175,6 +175,17 @@ function armConfirm(btn, action) {
   }, 2500);
 }
 
+/* ---- drag & drop state ---- */
+
+let drag = null; // { type: "cmd" | "cat", index?, id?, el }
+
+function endDrag() {
+  document.querySelectorAll(".dragging, .drop-above, .drop-below, .drop-into").forEach(el => {
+    el.classList.remove("dragging", "drop-above", "drop-below", "drop-into");
+  });
+  drag = null;
+}
+
 /* ---- command rows ---- */
 
 /* Render the command text; {param} becomes a clickable span. */
@@ -198,6 +209,8 @@ function renderTemplateHtml(template) {
 function buildRow(item, index) {
   const li = document.createElement("li");
   li.className = "cmd";
+  li.draggable = true;
+  li._cmdIndex = index;
   li._values = {};
 
   const name = document.createElement("span");
@@ -242,7 +255,64 @@ function buildRow(item, index) {
     activate(li, item, copyBtn, param);
   });
 
+  /* drag: reorder within a category, or drop into another category */
+  li.addEventListener("dragstart", e => {
+    if (li.querySelector("input[data-param]")) { e.preventDefault(); return; } // not while editing
+    drag = { type: "cmd", index, el: li };
+    li.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", "netcmd-cmd");
+  });
+  li.addEventListener("dragend", endDrag);
+  li.addEventListener("dragover", e => {
+    if (!drag || drag.type !== "cmd") return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
+    document.querySelectorAll(".drop-above, .drop-below").forEach(el => el.classList.remove("drop-above", "drop-below"));
+    const rect = li.getBoundingClientRect();
+    const before = e.clientY < rect.top + rect.height / 2;
+    li.classList.toggle("drop-above", before);
+    li.classList.toggle("drop-below", !before);
+  });
+  li.addEventListener("drop", e => {
+    if (!drag || drag.type !== "cmd") return;
+    e.preventDefault();
+    e.stopPropagation();
+    const before = li.classList.contains("drop-above");
+    dropCommand(drag.index, li._cmdIndex, before);
+  });
+
   return li;
+}
+
+/* Move command `from` to before/after command `to` (same array indexes). */
+function dropCommand(from, to, before) {
+  const cmds = loadCommands();
+  if (from === to || from < 0 || to < 0 || from >= cmds.length || to >= cmds.length) {
+    endDrag();
+    return;
+  }
+  const target = cmds[to];
+  const [moved] = cmds.splice(from, 1);
+  moved.cat = target.cat; // dropping onto a row adopts that row's category
+  const idx = cmds.indexOf(target);
+  cmds.splice(before ? idx : idx + 1, 0, moved);
+  saveCommands(cmds);
+  endDrag();
+  render();
+}
+
+/* Move command `from` to the end of category `catId`. */
+function dropCommandIntoCategory(from, catId) {
+  const cmds = loadCommands();
+  if (from < 0 || from >= cmds.length) { endDrag(); return; }
+  const [moved] = cmds.splice(from, 1);
+  moved.cat = catId;
+  cmds.push(moved);
+  saveCommands(cmds);
+  endDrag();
+  render();
 }
 
 /* Turn {param} spans into in-place inputs (focusParam = which one to focus). */
@@ -252,6 +322,8 @@ function activate(li, item, copyBtn, focusParam) {
     copyToClipboard(item.template).then(() => showCopied(copyBtn));
     return;
   }
+
+  li.draggable = false; // don't drag while typing
 
   let inputs = [...li.querySelectorAll("input[data-param]")];
   if (!inputs.length) {
@@ -312,6 +384,7 @@ function finishEdit(li, item, copyBtn) {
     input.replaceWith(span);
   });
   li._values = values;
+  li.draggable = true;
   copyToClipboard(fillTemplate(item.template, values)).then(() => showCopied(copyBtn));
 }
 
@@ -325,11 +398,65 @@ function cancelEdit(li) {
     span.textContent = "{" + input.dataset.param + "}";
     input.replaceWith(span);
   });
+  li.draggable = true;
+}
+
+/* ---- category context menu (right-click or the ⋯ button) ---- */
+
+let ctxMenu = null;
+function closeCtxMenu() {
+  if (ctxMenu) { ctxMenu.remove(); ctxMenu = null; }
+}
+document.addEventListener("click", e => {
+  if (!e.target.closest(".ctx-menu")) closeCtxMenu();
+});
+document.addEventListener("scroll", closeCtxMenu, true);
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeCtxMenu(); });
+
+function menuItem(text, onClick) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.textContent = text;
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+function openCatMenu(x, y, catId, catName, isVirtual) {
+  closeCtxMenu();
+  const menu = document.createElement("div");
+  menu.className = "ctx-menu";
+
+  const clearItem = menuItem("Clear all commands", () => {
+    armConfirm(clearItem, () => {
+      saveCommands(loadCommands().filter(c => c.cat !== catId));
+      closeCtxMenu();
+      render();
+    });
+  });
+  menu.appendChild(clearItem);
+
+  if (!isVirtual) {
+    const delItem = menuItem("Delete category", () => {
+      armConfirm(delItem, () => {
+        // commands inside are NOT lost — they fall to Uncategorized
+        saveCategories(loadCategories().filter(c => c.id !== catId));
+        closeCtxMenu();
+        render();
+      });
+    });
+    menu.appendChild(delItem);
+  }
+
+  document.body.appendChild(menu);
+  const r = menu.getBoundingClientRect();
+  menu.style.left = Math.max(4, Math.min(x, window.innerWidth - r.width - 8)) + "px";
+  menu.style.top = Math.max(4, Math.min(y, window.innerHeight - r.height - 8)) + "px";
+  ctxMenu = menu;
 }
 
 /* ---- category sections ---- */
 
-function buildSection(cat, rows, opts) {
+function buildSection(cat, rows, isVirtual) {
   const colors = colorByKey(cat.color);
   const section = document.createElement("section");
   section.className = "cat";
@@ -338,6 +465,8 @@ function buildSection(cat, rows, opts) {
 
   const header = document.createElement("div");
   header.className = "cat-header";
+  header.draggable = !isVirtual;
+  header.title = "Drag to reorder categories · right-click for actions";
 
   const chip = document.createElement("span");
   chip.className = "chip";
@@ -349,50 +478,74 @@ function buildSection(cat, rows, opts) {
   countEl.textContent = rows.length;
   header.append(chip, nameEl, countEl);
 
-  const actions = document.createElement("div");
-  actions.className = "cat-actions";
+  const kebab = document.createElement("button");
+  kebab.type = "button";
+  kebab.className = "cat-kebab";
+  kebab.textContent = "⋯";
+  kebab.title = "Category actions";
+  kebab.addEventListener("click", e => {
+    e.stopPropagation(); // keep the document click handler from closing it again
+    const r = kebab.getBoundingClientRect();
+    openCatMenu(r.left, r.bottom + 2, cat.id, cat.name, isVirtual);
+  });
+  header.appendChild(kebab);
 
-  if (opts.onClear) {
-    const clearBtn = document.createElement("button");
-    clearBtn.type = "button";
-    clearBtn.textContent = "clear";
-    clearBtn.title = "Clear all commands in this category";
-    clearBtn.addEventListener("click", e => {
-      e.stopPropagation();
-      armConfirm(clearBtn, opts.onClear);
-    });
-    actions.appendChild(clearBtn);
-  }
+  header.addEventListener("contextmenu", e => {
+    e.preventDefault();
+    openCatMenu(e.clientX, e.clientY, cat.id, cat.name, isVirtual);
+  });
 
-  if (opts.deletable) {
-    const delBtn = document.createElement("button");
-    delBtn.type = "button";
-    delBtn.textContent = "delete";
-    delBtn.title = "Delete empty category";
-    delBtn.addEventListener("click", e => {
-      e.stopPropagation();
-      armConfirm(delBtn, () => {
-        saveCategories(loadCategories().filter(c => c.id !== cat.id));
-        render();
-      });
-    });
-    actions.appendChild(delBtn);
-  }
+  /* drag: drop this category before another one */
+  header.addEventListener("dragstart", e => {
+    drag = { type: "cat", id: cat.id, el: header };
+    header.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", "netcmd-cat");
+  });
+  header.addEventListener("dragend", endDrag);
+  header.addEventListener("dragover", e => {
+    if (!drag || drag.type !== "cat" || drag.id === cat.id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    header.classList.add("drop-into");
+  });
+  header.addEventListener("drop", e => {
+    if (!drag || drag.type !== "cat" || drag.id === cat.id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const cats = loadCategories();
+    const from = cats.findIndex(c => c.id === drag.id);
+    const to = cats.findIndex(c => c.id === cat.id);
+    if (from > -1 && to > -1 && from !== to) {
+      const [moved] = cats.splice(from, 1);
+      cats.splice(to, 0, moved);
+      saveCategories(cats);
+    }
+    endDrag();
+    render();
+  });
 
-  if (actions.childNodes.length) header.appendChild(actions);
   section.appendChild(header);
+
+  /* dropping a command on empty section space = append to this category */
+  section.addEventListener("dragover", e => {
+    if (!drag || drag.type !== "cmd") return;
+    if (e.target.closest("li.cmd")) return; // rows handle themselves
+    e.preventDefault();
+    section.classList.add("drop-into");
+  });
+  section.addEventListener("drop", e => {
+    if (!drag || drag.type !== "cmd") return;
+    if (e.target.closest("li.cmd")) return;
+    e.preventDefault();
+    dropCommandIntoCategory(drag.index, cat.id);
+  });
 
   const ul = document.createElement("ul");
   rows.forEach(row => ul.appendChild(row));
   section.appendChild(ul);
 
   return section;
-}
-
-/* Clear a whole category in one shot. */
-function clearCategory(catId) {
-  saveCommands(loadCommands().filter(c => c.cat !== catId));
-  render();
 }
 
 function render() {
@@ -406,23 +559,13 @@ function render() {
     const rows = cmds.map((c, i) => ({ c, i }))
       .filter(({ c }) => c.cat === cat.id)
       .map(({ c, i }) => buildRow(c, i));
-    // any category is deletable once it's empty
-    wrap.appendChild(buildSection(cat, rows, {
-      deletable: rows.length === 0,
-      onClear: () => clearCategory(cat.id),
-    }));
+    wrap.appendChild(buildSection(cat, rows, false));
   });
 
   // commands whose category is gone (or was never set)
   const orphan = cmds.map((c, i) => ({ c, i })).filter(({ c }) => !cats.some(k => k.id === c.cat));
   if (orphan.length) {
-    wrap.appendChild(buildSection({ name: "Uncategorized", color: "gray" }, orphan.map(({ c, i }) => buildRow(c, i)), {
-      onClear: () => {
-        const valid = new Set(loadCategories().map(k => k.id));
-        saveCommands(loadCommands().filter(c => valid.has(c.cat)));
-        render();
-      },
-    }));
+    wrap.appendChild(buildSection({ id: "", name: "Uncategorized", color: "gray" }, orphan.map(({ c, i }) => buildRow(c, i)), true));
   }
 
   refreshCatSelect(cats);
@@ -498,6 +641,166 @@ document.getElementById("add-cat-form").addEventListener("submit", e => {
 });
 
 buildSwatches();
+
+/* ---- YAML data (edit / replace everything) ---- */
+
+function yamlQuote(s) {
+  return '"' + String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+}
+
+function toYaml() {
+  const lines = [
+    "# NetCmd data. Edit, then click 'Replace all' — this replaces EVERYTHING.",
+    "categories:",
+  ];
+  loadCategories().forEach(c => {
+    lines.push("  - id: " + yamlQuote(c.id));
+    lines.push("    name: " + yamlQuote(c.name));
+    lines.push("    color: " + yamlQuote(c.color || "gray"));
+    if (c.builtin) lines.push("    builtin: true");
+  });
+  lines.push("commands:");
+  loadCommands().forEach(c => {
+    lines.push("  - name: " + yamlQuote(c.name || ""));
+    lines.push("    template: " + yamlQuote(c.template));
+    lines.push("    cat: " + yamlQuote(c.cat || ""));
+  });
+  return lines.join("\n") + "\n";
+}
+
+function stripYamlComment(line) {
+  let inS = false, inD = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === "'" && !inD) inS = !inS;
+    else if (ch === '"' && !inS) inD = !inD;
+    else if (ch === "#" && !inS && !inD && (i === 0 || /\s/.test(line[i - 1]))) return line.slice(0, i);
+  }
+  return line;
+}
+
+function yamlScalar(s) {
+  s = s.trim();
+  if (s.startsWith('"') && s.endsWith('"') && s.length >= 2) {
+    return s.slice(1, -1).replace(/\\(["\\])/g, "$1");
+  }
+  if (s.startsWith("'") && s.endsWith("'") && s.length >= 2) return s.slice(1, -1);
+  if (s === "true") return true;
+  if (s === "false") return false;
+  return s;
+}
+
+/* Minimal YAML subset: exactly the shape toYaml() writes — top-level
+ * "categories:" / "commands:" with "- key: value" list items. */
+function parseYaml(text) {
+  const categories = [];
+  const commands = [];
+  let section = null;
+  let current = null;
+
+  text.split(/\r?\n/).forEach(raw => {
+    const line = stripYamlComment(raw);
+    if (!line.trim()) return;
+    const content = line.trim();
+    const indent = line.match(/^\s*/)[0].length;
+
+    if (indent === 0) {
+      const m = content.match(/^([\w-]+):(.*)$/);
+      current = null;
+      section = m && !m[2].trim() && (m[1] === "categories" || m[1] === "commands") ? m[1] : null;
+      return;
+    }
+
+    let m = content.match(/^-\s+([\w-]+):\s*(.*)$/);
+    if (m && section) {
+      current = {};
+      (section === "categories" ? categories : commands).push(current);
+      current[m[1]] = yamlScalar(m[2]);
+      return;
+    }
+    m = content.match(/^([\w-]+):\s*(.*)$/);
+    if (m && current) current[m[1]] = yamlScalar(m[2]);
+  });
+
+  return { categories, commands };
+}
+
+function importYaml(text) {
+  const { categories, commands } = parseYaml(text);
+
+  const seen = new Set();
+  const cats = categories
+    .filter(c => c && c.id && c.name)
+    .map(c => ({
+      id: String(c.id),
+      name: String(c.name),
+      color: colorByKey(String(c.color || "")).key === String(c.color) ? String(c.color) : "gray",
+      ...(c.builtin === true ? { builtin: true } : {}),
+    }))
+    .filter(c => !seen.has(c.id) && seen.add(c.id));
+
+  const cmds = commands
+    .filter(c => c && c.template)
+    .map(c => ({
+      name: c.name ? String(c.name) : "",
+      template: String(c.template),
+      cat: c.cat ? String(c.cat) : "",
+    }));
+
+  if (!cats.length && !cmds.length) throw new Error("no categories or commands found");
+  return { cats, cmds };
+}
+
+const dataBox = document.getElementById("data-box");
+const yamlText = document.getElementById("yaml-text");
+const yamlMsg = document.getElementById("yaml-msg");
+
+function setYamlMsg(text, bad) {
+  yamlMsg.textContent = text;
+  yamlMsg.classList.toggle("bad", !!bad);
+}
+
+dataBox.addEventListener("toggle", () => {
+  if (dataBox.open) { yamlText.value = toYaml(); setYamlMsg(""); }
+});
+
+document.getElementById("yaml-reload").addEventListener("click", () => {
+  yamlText.value = toYaml();
+  setYamlMsg("");
+});
+
+document.getElementById("yaml-download").addEventListener("click", () => {
+  const blob = new Blob([yamlText.value], { type: "text/yaml" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "netcmd.yaml";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+document.getElementById("yaml-file").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => { yamlText.value = reader.result; setYamlMsg(""); };
+  reader.readAsText(file);
+  e.target.value = ""; // allow re-opening the same file
+});
+
+document.getElementById("yaml-replace").addEventListener("click", e => {
+  armConfirm(e.currentTarget, () => {
+    try {
+      const { cats, cmds } = importYaml(yamlText.value);
+      saveCategories(cats);
+      saveCommands(cmds);
+      render();
+      yamlText.value = toYaml();
+      setYamlMsg("Imported " + cmds.length + " commands, " + cats.length + " categories");
+    } catch (err) {
+      setYamlMsg("Import failed: " + err.message, true);
+    }
+  });
+});
 
 /* ---- name column toggle (persisted) ---- */
 
