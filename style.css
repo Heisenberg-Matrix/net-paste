@@ -44,7 +44,21 @@ li.cmd:hover { background: #f0f0f0; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.cmd .template .param { color: #b05c00; }
+.cmd .template .param { color: #b05c00; cursor: text; }
+.cmd .template .param.filled { color: #2c7a2c; }
+
+/* in-place parameter input, blends into the command line */
+.cmd .template input {
+  font: inherit;
+  color: #b05c00;
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed #b05c00;
+  padding: 0;
+  height: 1.2em;
+}
+.cmd .template input::placeholder { color: #d9b385; }
+.cmd .template input:focus { outline: none; border-bottom: 1px solid #b05c00; background: #fffdf5; }
 
 .cmd .copy-btn {
   font: inherit;
@@ -67,26 +81,6 @@ li.cmd:hover { background: #f0f0f0; }
   padding: 0 2px;
 }
 .cmd .del-btn:hover { color: #c33; }
-
-/* inline parameter form, shown under the row */
-.param-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  padding: 5px 6px;
-  background: #f3f3f3;
-  border-bottom: 1px solid #eee;
-}
-.param-form label { color: #555; }
-.param-form input {
-  font: inherit;
-  border: 1px solid #bbb;
-  padding: 1px 5px;
-  width: 18ch;
-}
-.param-form input:focus { outline: 1px solid #2c7a2c; }
-.param-form .hint { color: #999; font-size: 12px; }
 
 /* add box */
 #add-box { margin-top: 12px; font-size: 13px; }

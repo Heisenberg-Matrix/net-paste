@@ -71,14 +71,15 @@ function showCopied(btn) {
 
 const listEl = document.getElementById("cmd-list");
 
+/* Render the command text; {param} becomes a clickable span. */
 function renderTemplateHtml(template) {
   const div = document.createElement("div");
   div.className = "template";
-  div.textContent = ""; // build safely below
   template.split(/(\{\w+\})/).forEach(part => {
-    if (/^\{\w+\}$/.test(part)) {
+    if (/^\{(\w+)\}$/.test(part)) {
       const s = document.createElement("span");
       s.className = "param";
+      s.dataset.param = part.slice(1, -1);
       s.textContent = part;
       div.appendChild(s);
     } else {
@@ -91,6 +92,7 @@ function renderTemplateHtml(template) {
 function buildRow(item, isCustom, index) {
   const li = document.createElement("li");
   li.className = "cmd";
+  li._values = {};
 
   const name = document.createElement("span");
   name.className = "name";
@@ -105,7 +107,7 @@ function buildRow(item, isCustom, index) {
   copyBtn.textContent = "Copy";
   copyBtn.addEventListener("click", e => {
     e.stopPropagation();
-    activate(li, item, copyBtn);
+    activate(li, item, copyBtn, null);
   });
   li.appendChild(copyBtn);
 
@@ -125,60 +127,95 @@ function buildRow(item, isCustom, index) {
     li.appendChild(delBtn);
   }
 
-  // clicking the row itself works the same as clicking Copy
-  li.addEventListener("click", () => activate(li, item, copyBtn));
+  // clicking a {param} span starts editing right there, in place
+  li.addEventListener("click", e => {
+    const param = e.target.dataset ? e.target.dataset.param : null;
+    activate(li, item, copyBtn, param);
+  });
 
   return li;
 }
 
-function activate(li, item, copyBtn) {
+/* Turn {param} spans into in-place inputs (focusParam = which one to focus). */
+function activate(li, item, copyBtn, focusParam) {
   const params = paramsOf(item.template);
   if (params.length === 0) {
     copyToClipboard(item.template).then(() => showCopied(copyBtn));
     return;
   }
-  // toggle inline parameter form
-  const existing = li.nextElementSibling;
-  if (existing && existing.classList.contains("param-form")) {
-    existing.querySelector("input").focus();
-    return;
-  }
-  const form = document.createElement("div");
-  form.className = "param-form";
-  const inputs = {};
-  params.forEach(p => {
-    const label = document.createElement("label");
-    label.textContent = p + ": ";
-    const input = document.createElement("input");
-    input.type = "text";
-    input.placeholder = p === "ip" ? "10.1.1.1" : p === "vlan" ? "10" : p === "interface" ? "GE1/0/1" : "1.1.1.1";
-    input.autocomplete = "off";
-    input.dataset.param = p;
-    label.appendChild(input);
-    form.appendChild(label);
-    inputs[p] = input;
-  });
-  const hint = document.createElement("span");
-  hint.className = "hint";
-  hint.textContent = "Enter = copy";
-  form.appendChild(hint);
 
-  form.addEventListener("keydown", e => {
+  let inputs = [...li.querySelectorAll("input[data-param]")];
+  if (!inputs.length) {
+    li.querySelectorAll("span[data-param]").forEach(span => {
+      span.replaceWith(makeInput(li, item, copyBtn, span.dataset.param));
+    });
+    inputs = [...li.querySelectorAll("input[data-param]")];
+  }
+
+  const target = focusParam
+    ? inputs.find(i => i.dataset.param === focusParam)
+    : (inputs.find(i => !i.value.trim()) || inputs[0]);
+  if (target) { target.focus(); target.select(); }
+}
+
+function makeInput(li, item, copyBtn, param) {
+  const input = document.createElement("input");
+  input.type = "text";
+  input.dataset.param = param;
+  input.value = li._values[param] || "";
+  input.autocomplete = "off";
+  input.spellcheck = false;
+  input.placeholder = param;
+  sizeInput(input);
+  input.addEventListener("input", () => sizeInput(input));
+  input.addEventListener("keydown", e => {
     if (e.key === "Enter") {
       e.preventDefault();
-      const values = {};
-      params.forEach(p => { values[p] = inputs[p].value.trim(); });
-      copyToClipboard(fillTemplate(item.template, values)).then(() => {
-        showCopied(copyBtn);
-        form.remove();
-      });
+      finishEdit(li, item, copyBtn);
     } else if (e.key === "Escape") {
-      form.remove();
+      e.preventDefault();
+      cancelEdit(li);
     }
   });
+  // keep clicks inside the input from re-triggering the row handler
+  input.addEventListener("click", e => e.stopPropagation());
+  return input;
+}
 
-  li.insertAdjacentElement("afterend", form);
-  params.length === 1 ? inputs[params[0]].select() : inputs[params[0]].focus();
+function sizeInput(input) {
+  input.style.width = Math.max(6, input.value.length + 1) + "ch";
+}
+
+/* Enter: freeze values back into the command line, copy it, done. */
+function finishEdit(li, item, copyBtn) {
+  const values = {};
+  li.querySelectorAll("input[data-param]").forEach(input => {
+    values[input.dataset.param] = input.value.trim();
+    const span = document.createElement("span");
+    span.dataset.param = input.dataset.param;
+    if (input.value.trim()) {
+      span.className = "param filled";
+      span.textContent = input.value.trim();
+    } else {
+      span.className = "param";
+      span.textContent = "{" + input.dataset.param + "}";
+    }
+    input.replaceWith(span);
+  });
+  li._values = values;
+  copyToClipboard(fillTemplate(item.template, values)).then(() => showCopied(copyBtn));
+}
+
+/* Escape: back to placeholders, values kept for next time. */
+function cancelEdit(li) {
+  li.querySelectorAll("input[data-param]").forEach(input => {
+    li._values[input.dataset.param] = input.value.trim();
+    const span = document.createElement("span");
+    span.className = "param";
+    span.dataset.param = input.dataset.param;
+    span.textContent = "{" + input.dataset.param + "}";
+    input.replaceWith(span);
+  });
 }
 
 function render() {
