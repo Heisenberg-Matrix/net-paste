@@ -177,14 +177,21 @@ function fallbackCopy(text) {
 }
 
 function showCopied(btn, row) {
-  const old = btn.textContent;
+  // reset any pending timers first — a second copy within the window must
+  // not capture "✓ Copied" as the text to restore (stuck-checkmark bug)
+  if (btn._copiedTimer) clearTimeout(btn._copiedTimer);
   btn.textContent = "✓ Copied";
   btn.classList.add("copied");
   if (row) {
+    if (row._flashTimer) clearTimeout(row._flashTimer);
     row.classList.add("just-copied");
-    setTimeout(() => row.classList.remove("just-copied"), 600);
+    row._flashTimer = setTimeout(() => row.classList.remove("just-copied"), 600);
   }
-  setTimeout(() => { btn.textContent = old; btn.classList.remove("copied"); }, 1200);
+  btn._copiedTimer = setTimeout(() => {
+    btn.textContent = "Copy";
+    btn.classList.remove("copied");
+    btn._copiedTimer = null;
+  }, 1200);
 }
 
 /*
