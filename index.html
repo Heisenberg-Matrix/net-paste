@@ -10,6 +10,7 @@
 <header>
   <span class="logo">NetCmd</span>
   <span class="tagline">Find. Fill. Copy.</span>
+  <button id="toggle-name" type="button"></button>
 </header>
 
 <main>
@@ -18,7 +19,7 @@
   <details id="add-box">
     <summary>+ Add command</summary>
     <form id="add-form">
-      <label>Name <input id="add-name" type="text" placeholder="BGP advertised routes" autocomplete="off"></label>
+      <label>Name (optional) <input id="add-name" type="text" placeholder="BGP advertised routes" autocomplete="off"></label>
       <label>Template <input id="add-template" type="text" placeholder="display bgp routing-table ipv4 peer {peer} advertised-routes" autocomplete="off"></label>
       <label>Category <select id="add-cat"></select></label>
       <button type="submit">Save</button>

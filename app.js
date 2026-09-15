@@ -4,6 +4,8 @@
 
 const STORAGE_KEY = "netcmd.custom";
 const CAT_STORAGE_KEY = "netcmd.categories";
+const HIDDEN_KEY = "netcmd.hidden";     // built-in commands deleted by the user (by template)
+const NAME_KEY = "netcmd.hideName";     // "1" = name column hidden
 
 /*
  * Eye-friendly color presets. Backgrounds are very low alpha so the
@@ -71,6 +73,13 @@ function loadCategories() {
 function saveCategories(list) {
   localStorage.setItem(CAT_STORAGE_KEY, JSON.stringify(list));
 }
+function loadHidden() {
+  try { return JSON.parse(localStorage.getItem(HIDDEN_KEY)) || []; }
+  catch { return []; }
+}
+function saveHidden(list) {
+  localStorage.setItem(HIDDEN_KEY, JSON.stringify(list));
+}
 
 function paramsOf(template) {
   const set = [];
@@ -130,7 +139,7 @@ function renderTemplateHtml(template) {
   return div;
 }
 
-function buildRow(item, isCustom) {
+function buildRow(item, isCustom, customIndex) {
   const li = document.createElement("li");
   li.className = "cmd";
   li._values = {};
@@ -152,24 +161,28 @@ function buildRow(item, isCustom) {
   });
   li.appendChild(copyBtn);
 
-  if (isCustom) {
-    const delBtn = document.createElement("button");
-    delBtn.className = "del-btn";
-    delBtn.type = "button";
-    delBtn.title = "Delete";
-    delBtn.textContent = "×";
-    delBtn.addEventListener("click", e => {
-      e.stopPropagation();
+  const delBtn = document.createElement("button");
+  delBtn.className = "del-btn";
+  delBtn.type = "button";
+  delBtn.title = "Delete";
+  delBtn.textContent = "×";
+  delBtn.addEventListener("click", e => {
+    e.stopPropagation();
+    if (isCustom) {
+      // customIndex is the row's position in the stored array at render time
       const custom = loadCustom();
-      const i = custom.indexOf(item);
-      if (i > -1) {
-        custom.splice(i, 1);
+      if (customIndex > -1 && customIndex < custom.length) {
+        custom.splice(customIndex, 1);
         saveCustom(custom);
-        render();
       }
-    });
-    li.appendChild(delBtn);
-  }
+    } else {
+      const hidden = loadHidden();
+      if (!hidden.includes(item.template)) hidden.push(item.template);
+      saveHidden(hidden);
+    }
+    render();
+  });
+  li.appendChild(delBtn);
 
   // clicking a {param} span starts editing right there, in place
   li.addEventListener("click", e => {
@@ -312,11 +325,15 @@ function render() {
 
   const cats = [...DEFAULT_CATEGORIES, ...loadCategories()];
   const custom = loadCustom();
+  const hidden = loadHidden();
 
   cats.forEach(cat => {
     const rows = [
-      ...BUILTINS.filter(c => c.cat === cat.id).map(c => buildRow(c, false)),
-      ...custom.filter(c => c.cat === cat.id).map(c => buildRow(c, true)),
+      ...BUILTINS.filter(c => c.cat === cat.id && !hidden.includes(c.template))
+        .map(c => buildRow(c, false)),
+      ...custom.map((c, i) => ({ c, i }))
+        .filter(({ c }) => c.cat === cat.id)
+        .map(({ c, i }) => buildRow(c, true, i)),
     ];
     // user-added categories are deletable only while empty
     const deletable = !DEFAULT_CATEGORIES.some(d => d.id === cat.id) && rows.length === 0;
@@ -324,9 +341,9 @@ function render() {
   });
 
   // custom commands whose category is gone (or was never set)
-  const orphan = custom.filter(c => !cats.some(k => k.id === c.cat));
+  const orphan = custom.map((c, i) => ({ c, i })).filter(({ c }) => !cats.some(k => k.id === c.cat));
   if (orphan.length) {
-    wrap.appendChild(buildSection({ name: "未分类", color: "gray" }, orphan.map(c => buildRow(c, true)), false));
+    wrap.appendChild(buildSection({ name: "未分类", color: "gray" }, orphan.map(({ c, i }) => buildRow(c, true, i)), false));
   }
 
   refreshCatSelect(cats);
@@ -402,4 +419,19 @@ document.getElementById("add-cat-form").addEventListener("submit", e => {
 });
 
 buildSwatches();
+
+/* ---- name column toggle (persisted) ---- */
+
+const nameToggle = document.getElementById("toggle-name");
+function applyNamePref() {
+  const hidden = localStorage.getItem(NAME_KEY) === "1";
+  document.body.classList.toggle("hide-name", hidden);
+  nameToggle.textContent = hidden ? "显示名称" : "隐藏名称";
+}
+nameToggle.addEventListener("click", () => {
+  localStorage.setItem(NAME_KEY, localStorage.getItem(NAME_KEY) === "1" ? "0" : "1");
+  applyNamePref();
+});
+applyNamePref();
+
 render();
