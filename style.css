@@ -53,16 +53,17 @@ body.hide-name .cmd .name { display: none; }
 }
 .cat-name { font-weight: bold; color: var(--accent); }
 .cat-count { color: #999; font-size: 11px; }
-.cat-header .del-btn {
+.cat-actions { margin-left: auto; display: flex; gap: 6px; }
+.cat-actions button {
   font: inherit;
-  border: none;
+  font-size: 11px;
+  color: #999;
   background: none;
-  color: #bbb;
+  border: none;
   cursor: pointer;
   padding: 0 2px;
-  margin-left: auto;
 }
-.cat-header .del-btn:hover { color: #c33; }
+.cat-actions button:hover { color: #c33; }
 
 .cat ul { list-style: none; }
 
@@ -127,6 +128,16 @@ li.cmd:hover { box-shadow: inset 0 0 0 999px rgba(0, 0, 0, 0.04); }
 }
 .cmd .del-btn:hover { color: #c33; }
 
+/* armed = two-step confirm state ("Sure?") */
+.armed { color: #c33 !important; font-weight: bold; }
+.cmd .del-btn.armed {
+  background: #c33;
+  color: #fff !important;
+  font-size: 11px;
+  font-weight: normal;
+  padding: 0 4px;
+}
+
 /* add boxes */
 details { margin-top: 12px; font-size: 13px; }
 details summary { cursor: pointer; color: #555; user-select: none; }
@@ -175,3 +186,15 @@ form button:hover { background: #eee; }
 .swatch input:checked ~ .dot { outline: 2px solid #444; outline-offset: 1px; }
 
 footer { margin-top: 20px; color: #aaa; font-size: 11px; }
+#reset-cats {
+  font: inherit;
+  font-size: 11px;
+  color: #aaa;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  margin-left: 8px;
+}
+#reset-cats:hover, #reset-cats.armed { color: #c33; }

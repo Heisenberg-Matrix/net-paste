@@ -12,20 +12,20 @@ const NAME_KEY = "netcmd.hideName";     // "1" = name column hidden
  * command text always stays readable on top of the tint.
  */
 const COLOR_PRESETS = [
-  { key: "red",    label: "浅红", accent: "#b0524a", bg: "rgba(176, 82, 74, 0.07)" },
-  { key: "green",  label: "浅绿", accent: "#0e7a5f", bg: "rgba(14, 122, 95, 0.05)" },
-  { key: "blue",   label: "浅蓝", accent: "#3a6ea5", bg: "rgba(58, 110, 165, 0.06)" },
-  { key: "amber",  label: "浅黄", accent: "#a97b12", bg: "rgba(169, 123, 18, 0.07)" },
-  { key: "purple", label: "浅紫", accent: "#7a5ea8", bg: "rgba(122, 94, 168, 0.06)" },
-  { key: "teal",   label: "浅青", accent: "#0e7f8c", bg: "rgba(14, 127, 140, 0.05)" },
-  { key: "gray",   label: "灰色", accent: "#666666", bg: "rgba(102, 102, 102, 0.05)" },
+  { key: "red",    label: "Red",    accent: "#b0524a", bg: "rgba(176, 82, 74, 0.07)" },
+  { key: "green",  label: "Green",  accent: "#0e7a5f", bg: "rgba(14, 122, 95, 0.05)" },
+  { key: "blue",   label: "Blue",   accent: "#3a6ea5", bg: "rgba(58, 110, 165, 0.06)" },
+  { key: "amber",  label: "Amber",  accent: "#a97b12", bg: "rgba(169, 123, 18, 0.07)" },
+  { key: "purple", label: "Purple", accent: "#7a5ea8", bg: "rgba(122, 94, 168, 0.06)" },
+  { key: "teal",   label: "Teal",   accent: "#0e7f8c", bg: "rgba(14, 127, 140, 0.05)" },
+  { key: "gray",   label: "Gray",   accent: "#666666", bg: "rgba(102, 102, 102, 0.05)" },
 ];
 const colorByKey = key =>
   COLOR_PRESETS.find(c => c.key === key) || COLOR_PRESETS[COLOR_PRESETS.length - 1];
 
 /* Built-in categories. User-added ones live in localStorage. */
 const DEFAULT_CATEGORIES = [
-  { id: "h3c", name: "华三", color: "red" },
+  { id: "h3c", name: "H3C", color: "red" },
   { id: "ib",  name: "IB",  color: "green" },
 ];
 
@@ -121,6 +121,29 @@ function showCopied(btn) {
   setTimeout(() => { btn.textContent = old; btn.classList.remove("copied"); }, 1200);
 }
 
+/*
+ * Two-step inline confirm for destructive actions: first click arms the
+ * button ("Sure?"), second click within 2.5s fires. No modal dialogs.
+ */
+function armConfirm(btn, action) {
+  if (btn.dataset.armed === "1") {
+    btn.dataset.armed = "";
+    action();
+    return;
+  }
+  btn.dataset.armed = "1";
+  btn.dataset.oldText = btn.textContent;
+  btn.textContent = "Sure?";
+  btn.classList.add("armed");
+  setTimeout(() => {
+    if (btn.dataset.armed === "1" && btn.isConnected) {
+      btn.dataset.armed = "";
+      btn.textContent = btn.dataset.oldText;
+      btn.classList.remove("armed");
+    }
+  }, 2500);
+}
+
 /* Render the command text; {param} becomes a clickable span. */
 function renderTemplateHtml(template) {
   const div = document.createElement("div");
@@ -168,19 +191,21 @@ function buildRow(item, isCustom, customIndex) {
   delBtn.textContent = "×";
   delBtn.addEventListener("click", e => {
     e.stopPropagation();
-    if (isCustom) {
-      // customIndex is the row's position in the stored array at render time
-      const custom = loadCustom();
-      if (customIndex > -1 && customIndex < custom.length) {
-        custom.splice(customIndex, 1);
-        saveCustom(custom);
+    armConfirm(delBtn, () => {
+      if (isCustom) {
+        // customIndex is the row's position in the stored array at render time
+        const custom = loadCustom();
+        if (customIndex > -1 && customIndex < custom.length) {
+          custom.splice(customIndex, 1);
+          saveCustom(custom);
+        }
+      } else {
+        const hidden = loadHidden();
+        if (!hidden.includes(item.template)) hidden.push(item.template);
+        saveHidden(hidden);
       }
-    } else {
-      const hidden = loadHidden();
-      if (!hidden.includes(item.template)) hidden.push(item.template);
-      saveHidden(hidden);
-    }
-    render();
+      render();
+    });
   });
   li.appendChild(delBtn);
 
@@ -277,7 +302,7 @@ function cancelEdit(li) {
 
 /* ---- category sections ---- */
 
-function buildSection(cat, rows, deletable) {
+function buildSection(cat, rows, opts) {
   const colors = colorByKey(cat.color);
   const section = document.createElement("section");
   section.className = "cat";
@@ -297,19 +322,37 @@ function buildSection(cat, rows, deletable) {
   countEl.textContent = rows.length;
   header.append(chip, nameEl, countEl);
 
-  if (deletable) {
-    const delBtn = document.createElement("button");
-    delBtn.className = "del-btn";
-    delBtn.type = "button";
-    delBtn.title = "Delete empty category";
-    delBtn.textContent = "×";
-    delBtn.addEventListener("click", () => {
-      saveCategories(loadCategories().filter(c => c.id !== cat.id));
-      render();
+  const actions = document.createElement("div");
+  actions.className = "cat-actions";
+
+  if (opts.onClear) {
+    const clearBtn = document.createElement("button");
+    clearBtn.type = "button";
+    clearBtn.textContent = "clear";
+    clearBtn.title = "Clear all commands in this category";
+    clearBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      armConfirm(clearBtn, opts.onClear);
     });
-    header.appendChild(delBtn);
+    actions.appendChild(clearBtn);
   }
 
+  if (opts.deletable) {
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.textContent = "delete";
+    delBtn.title = "Delete empty category";
+    delBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      armConfirm(delBtn, () => {
+        saveCategories(loadCategories().filter(c => c.id !== cat.id));
+        render();
+      });
+    });
+    actions.appendChild(delBtn);
+  }
+
+  if (actions.childNodes.length) header.appendChild(actions);
   section.appendChild(header);
 
   const ul = document.createElement("ul");
@@ -317,6 +360,17 @@ function buildSection(cat, rows, deletable) {
   section.appendChild(ul);
 
   return section;
+}
+
+/* Clear a whole category: hide its built-ins, drop custom commands in it. */
+function clearCategory(catId) {
+  const hidden = loadHidden();
+  BUILTINS.forEach(c => {
+    if (c.cat === catId && !hidden.includes(c.template)) hidden.push(c.template);
+  });
+  saveHidden(hidden);
+  saveCustom(loadCustom().filter(c => c.cat !== catId));
+  render();
 }
 
 function render() {
@@ -337,13 +391,19 @@ function render() {
     ];
     // user-added categories are deletable only while empty
     const deletable = !DEFAULT_CATEGORIES.some(d => d.id === cat.id) && rows.length === 0;
-    wrap.appendChild(buildSection(cat, rows, deletable));
+    wrap.appendChild(buildSection(cat, rows, { deletable, onClear: () => clearCategory(cat.id) }));
   });
 
   // custom commands whose category is gone (or was never set)
   const orphan = custom.map((c, i) => ({ c, i })).filter(({ c }) => !cats.some(k => k.id === c.cat));
   if (orphan.length) {
-    wrap.appendChild(buildSection({ name: "未分类", color: "gray" }, orphan.map(({ c, i }) => buildRow(c, true, i)), false));
+    wrap.appendChild(buildSection({ name: "Uncategorized", color: "gray" }, orphan.map(({ c, i }) => buildRow(c, true, i)), {
+      onClear: () => {
+        const valid = new Set([...DEFAULT_CATEGORIES, ...loadCategories()].map(k => k.id));
+        saveCustom(loadCustom().filter(c => valid.has(c.cat)));
+        render();
+      },
+    }));
   }
 
   refreshCatSelect(cats);
@@ -354,7 +414,7 @@ function refreshCatSelect(cats) {
   select.textContent = "";
   const uncat = document.createElement("option");
   uncat.value = "";
-  uncat.textContent = "未分类";
+  uncat.textContent = "Uncategorized";
   select.appendChild(uncat);
   cats.forEach(cat => {
     const opt = document.createElement("option");
@@ -426,12 +486,22 @@ const nameToggle = document.getElementById("toggle-name");
 function applyNamePref() {
   const hidden = localStorage.getItem(NAME_KEY) === "1";
   document.body.classList.toggle("hide-name", hidden);
-  nameToggle.textContent = hidden ? "显示名称" : "隐藏名称";
+  nameToggle.textContent = hidden ? "Show names" : "Hide names";
 }
 nameToggle.addEventListener("click", () => {
   localStorage.setItem(NAME_KEY, localStorage.getItem(NAME_KEY) === "1" ? "0" : "1");
   applyNamePref();
 });
 applyNamePref();
+
+/* ---- footer: clear all custom categories (kept out of the way) ----
+ * Commands inside them are NOT lost — they move to Uncategorized. */
+
+document.getElementById("reset-cats").addEventListener("click", e => {
+  armConfirm(e.currentTarget, () => {
+    saveCategories([]);
+    render();
+  });
+});
 
 render();
