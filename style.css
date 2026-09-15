@@ -267,31 +267,69 @@ form button:hover { background: #eee; }
 }
 .swatch input:checked ~ .dot { outline: 2px solid #444; outline-offset: 1px; }
 
-/* YAML data box */
-#data-box textarea {
-  width: 100%;
-  margin-top: 6px;
-  font: inherit;
+/* YAML data box: transparent textarea over a highlighted <pre> */
+.data-hint {
+  color: #888;
   font-size: 12px;
+  margin: 6px 0 0;
+}
+.data-hint b { color: #555; }
+.yaml-wrap {
+  position: relative;
+  margin-top: 6px;
   border: 1px solid #ccc;
-  background: #fff;
-  padding: 6px;
-  resize: vertical;
-  white-space: pre;
   border-radius: 6px;
+  background: #fff;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
 }
-#data-box textarea:focus {
-  outline: none;
+.yaml-wrap:focus-within {
   border-color: #3a6ea5;
   box-shadow: 0 0 0 2px rgba(58, 110, 165, 0.15);
 }
+#yaml-hl, .yaml-wrap textarea {
+  font: 12px/1.5 Consolas, Menlo, monospace;
+  letter-spacing: 0;
+  padding: 8px 10px;
+  margin: 0;
+  border: none;
+  white-space: pre;
+  overflow: auto;
+  tab-size: 2;
+}
+#yaml-hl {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: #444;
+}
+.yaml-wrap textarea {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 280px;
+  resize: vertical;
+  background: transparent;
+  color: transparent;
+  caret-color: #222;
+  outline: none;
+}
+.y-key { color: #3a6ea5; }
+.y-str { color: #8a5a00; }
+.y-bool { color: #7a5ea8; }
+.y-param { color: #b05c00; font-weight: bold; }
+.y-com { color: #9aa0a6; font-style: italic; }
+
 .data-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  margin-top: 6px;
+  margin-top: 8px;
+  padding: 6px 8px;
+  background: #f3f3f3;
+  border: 1px solid #ddd;
+  border-radius: 6px;
 }
 .data-actions button, .file-label {
   font: inherit;
@@ -305,6 +343,8 @@ form button:hover { background: #eee; }
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 .data-actions button:hover, .file-label:hover { background: #eee; }
+#yaml-replace { border-color: #2c7a2a; color: #2c7a2a; font-weight: bold; }
+#yaml-replace.armed { border-color: #c33; }
 .file-label input { display: none; }
 #yaml-msg { color: #2c7a2a; font-size: 12px; }
 #yaml-msg.bad { color: #c33; }

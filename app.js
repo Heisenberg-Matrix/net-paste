@@ -782,6 +782,7 @@ function importYaml(text) {
 
 const dataBox = document.getElementById("data-box");
 const yamlText = document.getElementById("yaml-text");
+const yamlHl = document.getElementById("yaml-hl");
 const yamlMsg = document.getElementById("yaml-msg");
 
 function setYamlMsg(text, bad) {
@@ -789,20 +790,93 @@ function setYamlMsg(text, bad) {
   yamlMsg.classList.toggle("bad", !!bad);
 }
 
-dataBox.addEventListener("toggle", () => {
-  if (dataBox.open) { yamlText.value = toYaml(); setYamlMsg(""); }
+/* ---- YAML syntax highlight (transparent textarea over a colored <pre>) ---- */
+
+function escHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function hlValue(v) {
+  const lead = v.match(/^\s*/)[0];
+  const t = v.trim();
+  let body;
+  if (t === "true" || t === "false") {
+    body = '<span class="y-bool">' + escHtml(t) + "</span>";
+  } else if (t.length >= 2 && ((t[0] === '"' && t.endsWith('"')) || (t[0] === "'" && t.endsWith("'")))) {
+    // quoted string; {param} inside gets the same orange as the main UI
+    const q = t[0];
+    body = '<span class="y-str">' + escHtml(q) + "</span>"
+      + escHtml(t.slice(1, -1)).replace(/\{(\w+)\}/g, '<span class="y-param">{$1}</span>')
+      + '<span class="y-str">' + escHtml(q) + "</span>";
+  } else {
+    body = escHtml(t);
+  }
+  return escHtml(lead) + body;
+}
+
+function hlYamlLine(line) {
+  // split off a comment (only a # that sits outside quotes)
+  let code = line, comment = "";
+  let inS = false, inD = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === "'" && !inD) inS = !inS;
+    else if (ch === '"' && !inS) inD = !inD;
+    else if (ch === "#" && !inS && !inD && (i === 0 || /\s/.test(line[i - 1]))) {
+      code = line.slice(0, i);
+      comment = line.slice(i);
+      break;
+    }
+  }
+
+  let html;
+  const m = code.match(/^(\s*(?:-\s+)?)([\w-]+)(:)(\s*)(.*)$/);
+  if (m) {
+    html = escHtml(m[1]) + '<span class="y-key">' + escHtml(m[2]) + "</span>"
+      + escHtml(m[3]) + escHtml(m[4]) + hlValue(m[5]);
+  } else {
+    html = escHtml(code);
+  }
+  if (comment) html += '<span class="y-com">' + escHtml(comment) + "</span>";
+  return html;
+}
+
+function syncHighlight() {
+  yamlHl.innerHTML = yamlText.value.split(/\r?\n/).map(hlYamlLine).join("\n") + "\n";
+  yamlHl.scrollTop = yamlText.scrollTop;
+  yamlHl.scrollLeft = yamlText.scrollLeft;
+}
+
+yamlText.addEventListener("input", syncHighlight);
+yamlText.addEventListener("scroll", () => {
+  yamlHl.scrollTop = yamlText.scrollTop;
+  yamlHl.scrollLeft = yamlText.scrollLeft;
+});
+yamlText.addEventListener("keydown", e => {
+  if (e.key === "Tab") { // two-space indent, YAML-style
+    e.preventDefault();
+    yamlText.setRangeText("  ", yamlText.selectionStart, yamlText.selectionEnd, "end");
+    syncHighlight();
+  }
 });
 
-document.getElementById("yaml-reload").addEventListener("click", () => {
+function refreshYaml(msg, bad) {
   yamlText.value = toYaml();
-  setYamlMsg("");
+  syncHighlight();
+  setYamlMsg(msg || "", bad);
+}
+
+dataBox.addEventListener("toggle", () => {
+  if (dataBox.open) refreshYaml();
 });
+
+document.getElementById("yaml-reload").addEventListener("click", () => refreshYaml());
 
 document.getElementById("yaml-download").addEventListener("click", () => {
   const blob = new Blob([yamlText.value], { type: "text/yaml" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "netcmd.yaml";
+  a.download = "net-paste.yaml";
   a.click();
   URL.revokeObjectURL(a.href);
 });
@@ -813,6 +887,7 @@ document.getElementById("yaml-file").addEventListener("change", e => {
   const reader = new FileReader();
   reader.onload = () => {
     yamlText.value = reader.result;
+    syncHighlight();
     setYamlMsg("Loaded — review, then click Replace all");
   };
   reader.readAsText(file);
@@ -826,8 +901,7 @@ document.getElementById("yaml-replace").addEventListener("click", e => {
       saveCategories(cats);
       saveCommands(cmds);
       render();
-      yamlText.value = toYaml();
-      setYamlMsg("Imported " + cmds.length + " commands, " + cats.length + " categories");
+      refreshYaml("Imported " + cmds.length + " commands, " + cats.length + " categories");
     } catch (err) {
       setYamlMsg("Import failed: " + err.message, true);
     }

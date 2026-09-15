@@ -37,7 +37,11 @@
 
   <details id="data-box">
     <summary>Data (YAML)</summary>
-    <textarea id="yaml-text" rows="16" spellcheck="false"></textarea>
+    <p class="data-hint">Data lives in your browser's localStorage. <b>Export</b> writes a real .yaml file, <b>Import</b> loads one back. Edit below and <b>Replace all</b> to apply.</p>
+    <div class="yaml-wrap">
+      <pre id="yaml-hl" aria-hidden="true"></pre>
+      <textarea id="yaml-text" spellcheck="false"></textarea>
+    </div>
     <div class="data-actions">
       <button type="button" id="yaml-reload">Reload</button>
       <button type="button" id="yaml-download">Export</button>

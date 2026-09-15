@@ -64,12 +64,13 @@
 
 ### 数据替换（YAML）
 
-页面底部 **Data (YAML)** 折叠框：
+页面底部 **Data (YAML)** 折叠框。**存储模型**：运行时数据在浏览器 localStorage；YAML 文件只在 Export 时落盘、Import 时读回——不是页面运行时挂载的文件，这与“无后端、双击 index.html 即用”的原则自洽。
 
-- 打开即显示当前全部数据的 YAML（categories + commands，所见即所得）。
-- 直接改文本 → **Replace all**（两步确认）→ **整体替换**所有命令和分类。
-- **Export** 下载文本框内容为 .yaml 文件；**Import** 载入本地 .yaml 到文本框（提示 review 后再 Replace all）。
+- 打开即显示当前全部数据的 YAML（带**语法高亮**：key 蓝、字符串琥珀、`{param}` 橙色加粗与主界面一致、注释灰斜体、布尔紫）。
+- 直接改文本 → **Replace all**（两步确认，绿色主按钮）→ **整体替换**所有命令和分类。
+- **Export** 下载文本框内容为 .yaml 文件；**Import** 载入本地 .yaml 到编辑器（提示 review 后再 Replace all）。
 - **Reload** 从存储重新生成（撤销手改）。
+- 编辑器细节：Tab 键输入两空格缩进；焦点时蓝色光环提示。
 - YAML 只支持本工具生成的子集（`categories:` / `commands:` 两个列表），不追求通用；注释、单双引号、转义都支持。
 - 换电脑/换浏览器：Export → 新环境 Import → Replace all。
 
@@ -154,3 +155,4 @@
 | v0.1.7 | 移除底部 Clear custom categories（右键菜单已覆盖）；飞书风格 grip 拖拽手柄（仅 grip 可拖、grab/grabbing 光标）；修复 Sure? 确认后按钮不恢复；YAML 按钮改名 Export / Import |
 | v0.1.8 | 控件圆角化：按钮 4px + 极轻阴影，输入框/折叠框 6px，YAML 文本框 focus 高亮，行保持全平 |
 | v0.1.9 | 复制反馈增强：✓ Copied + 按钮弹跳 + 整行绿色闪烁渐隐 |
+| v0.1.10 | YAML 编辑器语法高亮（透明 textarea + 高亮层叠加）、Tab 缩进、数据区 UI 重做（提示语、操作栏、Replace 主按钮、导出名改 net-paste.yaml） |
